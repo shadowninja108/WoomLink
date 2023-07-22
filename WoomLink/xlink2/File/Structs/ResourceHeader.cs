@@ -2,27 +2,26 @@
 
 namespace WoomLink.xlink2.File.Structs
 {
-    [StructLayout(LayoutKind.Sequential, Size = 0x48)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct ResourceHeader
     {
         public uint Magic;
         public uint DataSize;
         public uint Version;
-        public uint NumResParam;
-        public uint NumResAssetParam;
-        public uint NumResTriggerOverwriteParam;
-        public uint TriggerOverwriteParamTablePos;
-        public uint LocalPropertyNameRefTablePos;
-        public uint NumLocalPropertyNameRefTable;
-        public uint NumLocalPropertyEnumNameRefTable;
-        public uint NumDirectValueTable;
-        public uint NumRandomTable;
-        public uint NumCurveTable;
-        public uint NumCurvePointTable;
-        public uint ExRegionPos;
-        public uint NumUser;
-        public uint ConditionTablePos;
-        public uint NameTablePos;
+        public int NumResParam;
+        public int NumResAssetParam;
+        public int NumResTriggerOverwriteParam;
+        public UintPointer TriggerOverwriteParamTablePos;
+        public UintPointer LocalPropertyNameRefTablePos;
+        public int NumLocalPropertyNameRefTable;
+        public int NumLocalPropertyEnumNameRefTable;
+        public int NumDirectValueTable;
+        public int NumRandomTable;
+        public int NumCurveTable;
+        public int NumCurvePointTable;
+        public UintPointer ExRegionPos;
+        public int NumUser;
+        public UintPointer ConditionTablePos;
+        public UintPointer NameTablePos;
     }
-
 }

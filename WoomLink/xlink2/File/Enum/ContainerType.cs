@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace WoomLink.xlink2.File.Enum
+﻿namespace WoomLink.xlink2.File.Enum
 {
     public enum ContainerType : uint
     {
@@ -14,5 +8,6 @@ namespace WoomLink.xlink2.File.Enum
         Blend = 3,
         Sequence = 4,
         Mono = 5,
+        Unk = 6,
     }
 }

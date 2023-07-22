@@ -2,7 +2,29 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
+    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+    <Configurations>Debug;Release;Debug (Thunder);Release (Thunder)</Configurations>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_BLITZ;XLINK_ARCH_32</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Thunder)|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_THUNDER;XLINK_ARCH_64</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_BLITZ;XLINK_ARCH_32</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Thunder)|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_THUNDER;XLINK_ARCH_64</DefineConstants>
   </PropertyGroup>
 
 </Project>

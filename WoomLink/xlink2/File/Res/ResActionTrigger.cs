@@ -1,38 +1,32 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 using WoomLink.xlink2.File.Enum;
 
 namespace WoomLink.xlink2.File.Res
 {
-    [StructLayout(LayoutKind.Sequential, Size = 0x18)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct ResActionTrigger
     {
+#if XLINK_VER_THUNDER
         public uint GuId;
-        public uint AssetCtbPos;
+        public int EndFrame;
+        public Pointer<ResAssetCallTable> AssetCtbPos;
+        public Pointer<char> String;
         public uint StartFrame;
+        public ushort Flag;
+        public ushort OverwriteHash;
+        public Pointer<ResTriggerOverwriteParam> OverwriteParam;
+#elif XLINK_VER_BLITZ
+        public uint GuId;
+        public Pointer<ResAssetCallTable> AssetCtbPos;
+        public Pointer<char> String;
         public int EndFrame;
         public ushort Flag;
         public ushort OverwriteHash;
-        public int OverwriteParamPos;
+        public Pointer<ResTriggerOverwriteParam> OverwriteParam;
 
-        public ActionTriggerType TriggerType
-        {
-            get
-            {
-                var flag = Flag >> 2;
-                if ((flag & (1 << 2)) != 0)
-                    return ActionTriggerType.Three;
-                if ((flag & (1 << 1)) != 0)
-                    return ActionTriggerType.Two;
-                if ((flag & (1 << 0)) != 0)
-                    return ActionTriggerType.One;
-                return ActionTriggerType.Zero;
-            }
-        }
+        public readonly uint StartFrame => String.PointerValue;
+#endif
+
+        public readonly ActionTriggerType TriggerType => ResourceUtil.GetActionTriggerType(in this);
     }
 }

@@ -1,6 +1,6 @@
 ﻿namespace WoomLink.xlink2.File.Enum
 {
-    public enum ParamType
+    public enum ParamType : uint
     {
         Int = 0,
         Float = 1,

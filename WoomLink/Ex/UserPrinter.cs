@@ -1,20 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
+using WoomLink.sead;
+using WoomLink.xlink2;
 using WoomLink.xlink2.File;
 using WoomLink.xlink2.File.Enum;
 using WoomLink.xlink2.File.Res;
-using WoomLink.xlink2.File.Res.Ex;
 using WoomLink.xlink2.Properties.Enum;
 
 namespace WoomLink.Ex
 {
     public class UserPrinter
     {
+        public static readonly TextWriter _writer = new StringWriter();
+
         private const bool ShowDefaultAssetParams = false;
 
         private int TabCount = 0;
@@ -23,13 +22,17 @@ namespace WoomLink.Ex
         private static void PrintTabs(int count)
         {
             for (var i = 0; i < count; i++)
+            {
+                _writer.Write("     ");
                 Console.Write("     ");
+            }
         }
 
         private void Write(string value)
         {
             if(AtNewLine)
                 PrintTabs(TabCount);
+            _writer.Write(value);
             Console.Write(value);
             AtNewLine = false;
         }
@@ -38,6 +41,7 @@ namespace WoomLink.Ex
         {
             if (AtNewLine)
                 PrintTabs(TabCount);
+            _writer.WriteLine(value);
             Console.WriteLine(value);
             AtNewLine = true;
         }
@@ -84,95 +88,129 @@ namespace WoomLink.Ex
             }
         }
 
-        public void PrintCondition(xlink2.System system, UserBinParam param, ResAssetCallTableEx act)
+        public void PrintCondition(xlink2.System system, ref CommonResourceParam commonParam, ref UserBinParam userParam, Pointer<ResAssetCallTable> actPtr)
         {
-            var condition = act.Condition;
-            var parent = param.AssetCallTableEx[act.Internal.ParentIndex];
+            ref var act = ref actPtr.Ref;
+            var conditionPtr = act.Condition;
+            ref var condition = ref conditionPtr.Ref;
+            ref var parent = ref userParam.AssetCallTableSpan[act.ParentIndex];
 
-            Debug.Assert(condition.IsNormal);
-            Debug.Assert(parent.ContainerParam.IsSwitch);
 
-            Write("if (");
-
-            Write(parent.ContainerParam.WatchPropertyName);
-            Write(" ");
-
-            WriteCompare(condition.NormalValue.CompareType);
-            Write(" ");
-
-            if (condition.NormalValue.IsSolvedBool && condition.NormalValue.IsGlobal)
+            if (condition.IsSwitch && parent.ParamAsContainer.Ref.Type == ContainerType.Switch)
             {
-                if (system.GlobalPropertyDefinitions[parent.ContainerParam.SwitchValue.LocalPropertyNameIdx] is EnumPropertyDefinition def)
+                Write("if (");
+
+                Write(parent.ParamAsContainer.GetForSwitch().Ref.WatchPropertyName.AsString());
+                Write(" ");
+
+                var forSwitch = conditionPtr.GetForSwitch();
+                WriteCompare(forSwitch.Ref.CompareType);
+                Write(" ");
+
+                if (forSwitch.Ref.IsSolvedBool && forSwitch.Ref.IsGlobalBool)
                 {
-                    Write(def.TypeName);
-                    Write("::");
+                    if (system.GlobalPropertyDefinitions[parent.ParamAsContainer.GetForSwitch().Ref.LocalPropertyNameIdx] is
+                        EnumPropertyDefinition def)
+                    {
+                        Write(def.TypeName);
+                        Write("::");
+                    }
                 }
-            }
 
-            switch (condition.NormalValue.PropertyType)
-            {
-                case PropertyType.Enum:
-                    Write(condition.ValueAsString);
-                    break;
-                case PropertyType.S32:
-                    Write(condition.ValueAsInt.ToString());
-                    break;
-                case PropertyType.F32:
-                    Write(condition.ValueAsFloat.ToString());
-                    break;
-                default:
-                    Write("?");
-                    break;
+                switch (forSwitch.Ref.PropertyType)
+                {
+                    case PropertyType.Enum:
+                        Write(forSwitch.GetStringValue().Value.AsString());
+                        break;
+                    case PropertyType.S32:
+                        Write(forSwitch.GetIntValue().ToString());
+                        break;
+                    case PropertyType.F32:
+                        Write(forSwitch.GetFloatValue().ToString());
+                        break;
+                    default:
+                        Write("?");
+                        break;
+                }
+
+                WriteLine(") {");
+                TabCount++;
             }
-            
-            WriteLine(") {");
-            TabCount++;
+            else if(parent.ParamAsContainer.Ref.IsRandom)
+            {
+                WriteLine($"random (weight: {conditionPtr.GetForRandom().Ref.Weight}) {{");
+                TabCount++;
+            }
         }
 
-        public void PrintContainer(UserBinParam param, ResContainerParamEx container)
+        public void PrintContainer(ref UserBinParam param, Pointer<ResContainerParam> containerPtr)
         {
+            ref var container = ref containerPtr.Ref;
             Debug.Assert(
-                container.IsSwitch ||
-                container.Internal.Type == ContainerType.Sequence ||
-                container.Internal.Type == ContainerType.Random ||
-                container.Internal.Type == ContainerType.Blend
+                container.Type == ContainerType.Mono ||
+                container.Type == ContainerType.Switch ||
+                container.IsRandom ||
+                container.Type == ContainerType.Sequence ||
+                container.Type == ContainerType.Blend ||
+                container.Type == ContainerType.Unk
             );
-
-            if (container.IsSwitch)
+            if (container.Type == ContainerType.Switch)
             {
                 Write("switch (");
-                Write(container.WatchPropertyName);
+                var switchs = containerPtr.GetForSwitch();
+                Write(switchs.Ref.WatchPropertyName.AsString());
                 WriteLine(") {");
             } 
-            else if (container.Internal.Type == ContainerType.Sequence)
+            else switch (container.Type)
             {
-                WriteLine("seq ()");
-            } 
-            else if (container.Internal.Type == ContainerType.Random)
-            {
-                Write("random (min: ");
-            } else if (container.Internal.Type == ContainerType.Blend)
-            {
-                WriteLine("blend {");
+                case ContainerType.Sequence:
+                    WriteLine("seq {");
+                    break;
+                case ContainerType.Random:
+                    WriteLine("random {");
+                    break;
+                case ContainerType.Random2:
+                    WriteLine("random2 {");
+                    break;
+                case ContainerType.Blend:
+                    WriteLine("blend {");
+                    break;
+                case ContainerType.Mono:
+                    WriteLine("mono {");
+                    break;
+                case ContainerType.Unk:
+                    WriteLine("unk {}");
+                    UnwrapOnce();
+                    return;
             }
 
             TabCount++;
 
-            var start = container.Internal.ChildrenStartIndex;
-            var end = container.Internal.ChildrenEndIndex;
+            var start = container.ChildrenStartIndex;
+            var end = container.ChildrenEndIndex;
+
+            void PrintAssetCall(ref UserBinParam param, ref ResContainerParam container, int idx)
+            {
+                ref var call = ref param.AssetCallTableSpan[idx];
+                Write(call.KeyName.AsString());
+
+                if (container.IsRandom)
+                {
+                    Write($" |\t{call.Condition.GetForRandom().Ref.Weight}");
+                }
+
+                WriteLine(",");
+            }
 
             if (end < start)
             {
-                Write(param.AssetCallTableEx[start].KeyName);
-                WriteLine(",");
+                PrintAssetCall(ref param, ref container, start);
             }
             else
             {
                 for (var i = start; i <= end; i++)
                 {
-                    var call = param.AssetCallTableEx[i];
-                    Write(call.KeyName);
-                    WriteLine(",");
+                    PrintAssetCall(ref param, ref container, i);
                 }
 
                 UnwrapOnce();
@@ -180,55 +218,78 @@ namespace WoomLink.Ex
             UnwrapOnce();
         }
 
-        public void PrintAssetParam(xlink2.System system, UserBinParam param, ResAssetCallTableEx act)
+        public void PrintAssetParam(xlink2.System system, ref CommonResourceParam commonParam, ref UserBinParam userParam, Pointer<ResAssetCallTable> actPtr)
         {
             WriteLine("run {");
             TabCount++;
 
+            ref var act = ref actPtr.Ref;
             var pdt = system.ResourceBuffer.PDT;
-            var asset = act.AssetParam;
+            var assetPtr = act.ParamAsAsset;
+            ref var asset = ref assetPtr.Ref;
+            var assetParams = assetPtr.GetValuesSpan();
             var condition = act.Condition;
 
-            for (var i = 0; i < asset.Params.Length; i++)
+            for (var bitIdx = 0; bitIdx < system.ResourceBuffer.PDT.NumTotalAssetParams; bitIdx++)
             {
-                var p = asset.Params[i];
-                var def = pdt.AssetParam[i];
-
-
-                if (p == null && !ShowDefaultAssetParams)
+                if (asset.IsParamDefault((uint)bitIdx) && !ShowDefaultAssetParams)
                     continue;
 
-                Write(def.Name);
+                ref var def = ref pdt.AssetParamSpan[bitIdx];
+                
+                Write(def.Name.AsString());
                 Write(" = ");
 
-                if (p.ReferenceType != ValueReferenceType.Direct && p.ReferenceType != ValueReferenceType.String)
+                if (!asset.IsParamDefault((uint)bitIdx))
                 {
-                    Write("(TODO)");
-                } 
-                else if (p != null)
-                {
-                    switch (def.Type)
+                    ref var p = ref assetParams[BitFlagUtil.CountRightOnBit64(asset.Bitfield, bitIdx) - 1];
+
+                    switch (p.ReferenceType)
                     {
-                        case ParamType.Int:
-                            Write(p.DirectValueAsUInt.ToString());
-                            break;
-                        case ParamType.Float:
-                            Write(p.DirectValueAsFloat.ToString());
-                            break;
-                        case ParamType.Bool:
-                            Write(p.DirectValueAsBool.ToString());
-                            break;
-                        case ParamType.Enum:
-                            Write(p.DirectValueAsUInt.ToString());
-                            Write(" (TODO)");
-                            break;
-                        case ParamType.String:
+                        //case ValueReferenceType.Curve:
+                        //    ref var curve = ref commonParam.CurvePointTableSpan[(int)p.Value];
+                        //    Write($"X: {curve.X} | Y: {curve.Y}");
+                        //    break;
+                        //
+                        case ValueReferenceType.String:
+                            Debug.Assert(def.Type == ParamType.String);
                             Write("\"");
-                            Write(p.DirectValueAsString);
+                            Write(Pointer<char>.As(p.Value + commonParam.NameTable).AsString());
                             Write("\"");
                             break;
-                        case ParamType.Byte:
+                        case ValueReferenceType.Curve:
+                        case ValueReferenceType.Direct:
+                        {
+                            switch (def.Type)
+                            {
+                                case ParamType.Int:
+                                    Write(commonParam.DirectValueTableSpanAsInts[(int)p.Value].ToString());
+                                    break;
+                                case ParamType.Float:
+                                    Write(commonParam.DirectValueTableSpanAsFloats[(int)p.Value].ToString());
+                                    break;
+                                case ParamType.Bool:
+                                    Write((commonParam.DirectValueTableSpan[(int)p.Value] != 0).ToString());
+                                    break;
+                                case ParamType.Enum:
+                                    Write(commonParam.DirectValueTableSpanAsInts[(int)p.Value].ToString());
+                                    Write(" (TODO)");
+                                    break;
+                                default:
+                                    Write(commonParam.DirectValueTableSpan[(int)p.Value].ToString());
+                                    break;
+                                }
                             break;
+                        }
+                    }
+
+                    if (
+                        p.ReferenceType != ValueReferenceType.Direct && 
+                        p.ReferenceType != ValueReferenceType.String
+                        //p.ReferenceType != ValueReferenceType.Curve
+                    )
+                    {
+                        Write($" ReferenceType:\t({p.ReferenceType})");
                     }
                 }
                 else
@@ -236,24 +297,24 @@ namespace WoomLink.Ex
                     switch (def.Type)
                     {
                         case ParamType.Int:
-                            Write(def.DefaultValue.ToString());
+                            Write(def.DefaultValueAsInt.ToString());
                             break;
                         case ParamType.Float:
                             Write(def.DefaultValueAsFloat.ToString());
                             break;
                         case ParamType.Bool:
-                            Write(def.DefaultValue != 0 ? "true" : "false");
+                            Write(def.DefaultValueAsInt != 0 ? "true" : "false");
                             break;
                         case ParamType.Enum:
                             Write("TODO");
                             break;
                         case ParamType.String:
                             Write("\"");
-                            Write(def.DefaultValueAsString);
+                            Write(def.DefaultValueAsString.AsString());
                             Write("\"");
                             break;
                         case ParamType.Byte:
-                            Write(def.DefaultValue.ToString());
+                            Write(def.DefaultValueAsInt.ToString());
                             break;
                     }
                 }
@@ -262,27 +323,28 @@ namespace WoomLink.Ex
             UnwrapOnce();
         }
 
-        public void Print(xlink2.System system, UserBinParam param)
+        public void Print(xlink2.System system, ref CommonResourceParam commonParam, ref UserBinParam userParam)
         {
-            foreach (var x in param.AssetCallTableEx)
+            for (var i = 0; i < userParam.Header.NumCallTable; i++)
             {
-                Write(x.KeyName);
+                var actPtr = userParam.AssetCallTable.Add(i);
+                ref var act = ref actPtr.Ref;
+                
+                Write(act.KeyName.AsString());
                 WriteLine(" {");
                 TabCount++;
 
-                if (x.Condition != null)
+                if (!act.Condition.IsNull())
                 {
-                    PrintCondition(system, param, x);
+                    PrintCondition(system, ref commonParam, ref userParam, actPtr);
                 }
 
-                if (x.ContainerParam != null)
+                if (act.IsContainer)
                 {
-                    PrintContainer(param, x.ContainerParam);
-                }
-
-                if (x.AssetParam != null)
+                    PrintContainer(ref userParam, act.ParamAsContainer);
+                } else
                 {
-                    PrintAssetParam(system, param, x);
+                    PrintAssetParam(system, ref commonParam, ref userParam, actPtr);
                 }
 
                 Unwrap();

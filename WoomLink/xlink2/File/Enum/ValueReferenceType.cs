@@ -19,5 +19,7 @@
         UnkD = 0xD,
         UnkE = 0xE,
         UnkF = 0xF,
+        Unk10 = 0x10,
+        Unk11 = 0x11
     };
 }

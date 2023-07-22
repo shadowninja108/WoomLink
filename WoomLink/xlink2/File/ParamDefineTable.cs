@@ -1,72 +1,123 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using WoomLink.xlink2.File.Enum;
 using WoomLink.xlink2.File.Structs;
 
 namespace WoomLink.xlink2.File
 {
-    public class ParamDefineTable
+    public struct ParamDefineTable
     {
-        public class ParamDefineEx
+        public int NumAllParams;
+        public int NumTotalAssetParams;
+        public int NumTriggerParams;
+        public Pointer<ParamDefine> UserParam;
+        public Pointer<ParamDefine> AssetParam;
+        public Pointer<ParamDefine> TriggerParam;
+        private Pointer<char> StringTable;
+        public int NumUserAssetParams;
+        public int NumStandardAssetParams;
+        public int NumNonUserParams;
+        public int NumUserParams;
+        public int TotalSize;
+        public bool Initialized;
+
+
+        public Span<ParamDefine> UserParamSpan
         {
-            private ParamDefine Internal;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => UserParam.AsSpan(NumAllParams);
+        }
 
-            public ParamDefineEx(ParamDefine @internal, string stringTable)
+        public Span<ParamDefine> AssetParamSpan
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => AssetParam.AsSpan(NumTotalAssetParams);
+        }
+
+        public Span<ParamDefine> TriggerParamSpan
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => TriggerParam.AsSpan(NumTriggerParams);
+        }
+
+        public void Setup(UintPointer data, uint userParamNum, bool showDebug)
+        {
+            if (Initialized) 
+                return;
+
+            var headerPtr = Pointer<ParamDefineTableHeader>.As(data);
+            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), ref headerPtr.Ref, Endianness.Big);
+            ref var header = ref headerPtr.Ref;
+
+            TotalSize = header.Size;
+            var totalUserParams = header.NumTotalUserParams;
+            NumAllParams = totalUserParams;
+            NumNonUserParams = (int)(totalUserParams - userParamNum);
+            NumUserParams = (int)userParamNum;
+            var totalAssetParams = header.NumTotalAssetParams;
+            NumTotalAssetParams = totalAssetParams;
+            var numUserAssetParams = header.NumUserAssetParams;
+            NumUserAssetParams = numUserAssetParams;
+            NumStandardAssetParams = totalAssetParams - numUserAssetParams;
+            NumTriggerParams = header.NumTriggerParams;
+            var startOfParams = headerPtr.AtEnd<ParamDefine>().AlignUp(Heap.PointerSize);
+            UserParam = startOfParams;
+            AssetParam = UserParam.Add(header.NumTotalUserParams);
+            TriggerParam = AssetParam.Add(header.NumTotalAssetParams);
+            StringTable = TriggerParam.Add(header.NumTriggerParams).Cast<char>();
+
+            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), UserParamSpan, Endianness.Big);
+            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), AssetParamSpan, Endianness.Big);
+            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), TriggerParamSpan, Endianness.Big);
+
+            Debug.Assert(StringTable.PointerValue < data + (ulong)header.Size);
+
+            static void Solve(ref ParamDefine define, UintPointer stringTable)
             {
-                Internal = @internal;
+                define.Name.PointerValue += stringTable;
 
-                Name = stringTable.GetNullTermString(Internal.Name);
-
-                if(Type == ParamType.String)
-                {
-                    DefaultValueAsString = stringTable.GetNullTermString((uint)Internal.DefaultValue);
-                }
+                if (define.Type == ParamType.String)
+                    define.DefaultValueAsString.PointerValue += stringTable;
             }
 
-            public string Name {  get; set; }
-            public ParamType Type => Internal.Type;
-            public int DefaultValue => Internal.DefaultValue;
+            foreach (ref var define in UserParamSpan)
+            {
+                Solve(ref define, StringTable.PointerValue);
+            }
 
-            public float DefaultValueAsFloat => BitConverter.Int32BitsToSingle(Internal.DefaultValue);
-            public string DefaultValueAsString = null;
+            foreach (ref var define in AssetParamSpan)
+            {
+                Solve(ref define, StringTable.PointerValue);
+            }
+
+            foreach (ref var define in TriggerParamSpan)
+            {
+                Solve(ref define, StringTable.PointerValue);
+            }
+
+            Initialized = true;
         }
 
-        public ParamDefineTableHeader Header;
-
-        public ParamDefineEx[] UserParam;
-        public ParamDefineEx[] AssetParam;
-        public ParamDefineEx[] TriggerParam;
-
-        private string StringTable;
-
-        public void Setup(Stream stream, int userParamNum)
+        public string GetAssetParamDefaultValueString(uint reff)
         {
-            var start = stream.Position;
-            stream.Read(Utils.AsSpan(ref Header));
-
-            var userParam = stream.ReadArray<ParamDefine>(Header.NumUserParams);
-            var assetParam = stream.ReadArray<ParamDefine>(Header.NumAssetParams);
-            var triggerParam = stream.ReadArray<ParamDefine>(Header.NumTriggerParams);
-
-            /* Rest of data is string table. */
-            byte[] stringTableRaw = new byte[Header.Size - (stream.Position - start)];
-            stream.Read(stringTableRaw);
-
-            StringTable = Encoding.UTF8.GetString(stringTableRaw);
-
-            UserParam = BuildParamDefineExArray(userParam);
-            AssetParam = BuildParamDefineExArray(assetParam);
-            TriggerParam = BuildParamDefineExArray(triggerParam);
+            if (NumTotalAssetParams <= reff)
+                return "";
+            return AssetParamSpan[(int)reff].DefaultValueAsString.AsString();
         }
 
-        private ParamDefineEx[] BuildParamDefineExArray(ParamDefine[] raw)
+        public int GetAssetParamDefaultValueInt(uint reff)
         {
-            return raw.Select((r) => new ParamDefineEx(r, StringTable)).ToArray();
+            if (NumTotalAssetParams <= reff)
+                return 0;
+            return AssetParamSpan[(int)reff].DefaultValueAsInt;
+        }
+
+        public float GetAssetParamDefaultValueFloat(uint reff)
+        {
+            if (NumTotalAssetParams <= reff)
+                return 0;
+            return AssetParamSpan[(int)reff].DefaultValueAsFloat;
         }
     }
 }

@@ -2,13 +2,15 @@
 
 namespace WoomLink.xlink2.File.Structs
 {
-    [StructLayout(LayoutKind.Sequential, Size = 0x14)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct ParamDefineTableHeader
     {
-        public uint Size;
-        public uint NumUserParams;
-        public uint NumAssetParams;
-        public uint Unk;
-        public uint NumTriggerParams;
+        public int Size;
+        public int NumTotalUserParams;
+        public int NumTotalAssetParams;
+        public int NumUserAssetParams;
+        public int NumTriggerParams;
+
+        public int NumStandardAssetParams => NumTotalAssetParams - NumUserAssetParams;
     }
 }

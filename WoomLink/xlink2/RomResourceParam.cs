@@ -1,13 +1,29 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
+using WoomLink.xlink2.File;
+using WoomLink.xlink2.File.Res;
+using WoomLink.xlink2.File.Structs;
 
 namespace WoomLink.xlink2
 {
-    public class RomResourceParam : CommonResourceParam
+    public struct RomResourceParam
     {
-        public uint NumUser;
+        public CommonResourceParam Common;
+        public Pointer<ResourceHeader> Data;
+        public Pointer<uint> UserDataHashes;
+        public Pointer<Pointer<ResUserHeader>> UserDataPointers;
+        public int NumUser;
+        public bool Setup;
+
+        public Span<uint> UserDataHashesSpan
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => UserDataHashes.AsSpan(NumUser);
+        }
+        public Span<Pointer<ResUserHeader>> UserDataPointersSpan
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => UserDataPointers.AsSpan(NumUser);
+        }
     }
 }

@@ -1,82 +1,59 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 using WoomLink.xlink2.File.Enum;
 
 namespace WoomLink.xlink2.File.Res
 {
-    public class ResCondition
+    public struct ResCondition
     {
         public ContainerType Type;
 
-        [StructLayout(LayoutKind.Sequential, Size = 0x4)]
+        public readonly bool IsRandom => Type is ContainerType.Random or ContainerType.Random2;
+        public readonly bool IsSequence => Type == ContainerType.Sequence;
+        public readonly bool IsSwitch => Type == ContainerType.Switch;
+        public readonly bool IsBlend => Type == ContainerType.Blend;
+
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct ForRandom
         {
             public float Weight;
         }
 
-        [StructLayout(LayoutKind.Sequential, Size = 0x10)]
-        public struct ForNormal
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ForSequence
         {
+            public int IsContinueOnFade;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ForSwitch
+        {
+#if XLINK_VER_BLITZ
             public PropertyType PropertyType;
             public CompareType CompareType;
-            public int Value;
+            public uint SmallValue;
             public short LocalPropertyEnumNameIdx;
             public byte IsSolved;
-            public bool IsGlobal;
+            public byte IsGlobal;
+#elif XLINK_VER_THUNDER
+            public PropertyType PropertyType;
+            public CompareType CompareType;
+            public byte IsSolved;
+            public byte IsGlobal;
+            public int LocalPropertyEnumNameIdx;
+            public uint SmallValue;
+#endif
 
             public bool IsSolvedBool => IsSolved != 0;
+            public bool IsGlobalBool => IsGlobal != 0;
         }
 
-        public ForRandom RandomValue;
-        public ForNormal NormalValue;
-
-        public string ValueAsString;
-        public int ValueAsInt => NormalValue.Value;
-        public float ValueAsFloat => BitConverter.Int32BitsToSingle(ValueAsInt);
-
-        public bool IsRandom => Type == ContainerType.Random || Type == ContainerType.Random2;
-        public bool IsNormal => !IsRandom;
-
-        public ResCondition(Stream stream)
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ForBlend
         {
-            var reader = new BinaryReader(stream);
-            Type = (ContainerType)reader.ReadUInt32();
-
-            if (IsRandom)
-            {
-                stream.Read(Utils.AsSpan(ref RandomValue));
-            }
-            else if (IsNormal)
-            {
-                stream.Read(Utils.AsSpan(ref NormalValue));
-            }
-        }
-
-        public void Solve(Stream stream, CommonResourceParam param)
-        {
-            if (!IsNormal)
-                return;
-
-            if (NormalValue.PropertyType != PropertyType.Enum)
-                return;
-
-            using (stream.TemporarySeek(param.NameTablePos + NormalValue.Value, SeekOrigin.Begin))
-                ValueAsString = new BinaryReader(stream).ReadUtf8Z();
-        }
-
-        public static IEnumerable<ResCondition> Read(Stream stream, uint end)
-        {
-            while (stream.Position < end)
-            {
-                yield return new ResCondition(stream);
-            }
+            public int Unk1;
+            public int Unk2;
+            public int Unk3;
         }
     }
 }

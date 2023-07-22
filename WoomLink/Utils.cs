@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -95,9 +95,53 @@ namespace WoomLink
             return ~start;
         }
 
+        public static int BinarySearch<T, K>(ReadOnlySpan<T> arr, K v) where T : IComparable<K>
+        {
+            var start = 0;
+            var end = arr.Length - 1;
+
+            while (start <= end)
+            {
+                var mid = (start + end) / 2;
+                var entry = arr[mid];
+                var cmp = entry.CompareTo(v);
+
+                if (cmp == 0)
+                    return mid;
+                if (cmp > 0)
+                    end = mid - 1;
+                else /* if (cmp < 0) */
+                    start = mid + 1;
+            }
+
+            return ~start;
+        }
+
+        public static int BinarySearch<T>(ReadOnlySpan<T> arr, Func<T, int> callback)
+        {
+            var start = 0;
+            var end = arr.Length - 1;
+
+            while (start <= end)
+            {
+                var mid = (start + end) / 2;
+                var entry = arr[mid];
+                var cmp = callback(entry);
+
+                if (cmp == 0)
+                    return mid;
+                if (cmp > 0)
+                    end = mid - 1;
+                else /* if (cmp < 0) */
+                    start = mid + 1;
+            }
+
+            return ~start;
+        }
+
         public static T[] ReadArray<T>(this Stream stream, uint count) where T : struct
         {
-            /* Read data. */
+            /* Allocate space for data. */
             T[] data = new T[count];
 
             /* Read into casted span. */
@@ -155,12 +199,15 @@ namespace WoomLink
             string text = reader.ReadUtf8(size);
             reader.BaseStream.Position++; // Skip the null byte
 
+            if (text.Contains("LobbyLocal_"))
+                ;
+
             return text;
         }
 
-        public static string GetNullTermString(this string str, uint start)
+        public static string GetNullTermString(this string str, ulong start)
         {
-            var end = str.IndexOf('\0', (int)start);
+            ulong end = (ulong)str.IndexOf('\0', (int)start);
             return str.Substring((int)start, (int)(end - start));
         }
 
@@ -188,6 +235,62 @@ namespace WoomLink
         public static long AlignUp(long num, long align)
         {
             return (num + (align - 1)) & ~(align - 1);
+        }
+
+
+        public static void MaybeAdjustEndianness<T>(Type type, Span<T> data, Endianness endianness) where T : struct
+        {
+            for(var i = 0; i < data.Length; i++)
+                MaybeAdjustEndianness(type, ref data[i], endianness);
+        }
+
+
+        public static void MaybeAdjustEndianness<T>(Type type, ref T data, Endianness endianness) where T : struct
+        {
+            MaybeAdjustEndiannessRaw(type, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref data, Unsafe.SizeOf<T>())), endianness);
+        }
+
+        public static void MaybeAdjustEndiannessRaw(Type type, Span<byte> data, Endianness endianness, int startOffset = 0)
+        {
+            if (Endian.Native == endianness)
+            {
+                // nothing to change => return
+                return;
+            }
+
+            foreach (var field in type.GetFields())
+            {
+                var fieldType = field.FieldType;
+                if (field.IsStatic)
+                    // don't process static fields
+                    continue;
+
+                if (fieldType == typeof(string))
+                    // don't swap bytes for strings
+                    continue;
+
+                var offset = Marshal.OffsetOf(type, field.Name).ToInt32();
+
+                // handle enums
+                if (fieldType.IsEnum)
+                    fieldType = Enum.GetUnderlyingType(fieldType);
+
+                // check for sub-fields to recurse if necessary
+                var subFields = fieldType.GetFields().Where(subField => subField.IsStatic == false).ToArray();
+
+                var effectiveOffset = startOffset + offset;
+
+                if (subFields.Length == 0)
+                {
+                    var r = data.Slice(effectiveOffset, Marshal.SizeOf(fieldType));
+                    r.Reverse();
+                }
+                else
+                {
+                    // recurse
+                    MaybeAdjustEndiannessRaw(fieldType, data, endianness, effectiveOffset);
+                }
+            }
         }
 
         public static int ParseInt(string s)

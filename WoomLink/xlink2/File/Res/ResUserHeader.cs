@@ -1,29 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 
 namespace WoomLink.xlink2.File.Res
 {
 
-    [StructLayout(LayoutKind.Sequential, Size = 0x30)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct ResUserHeader
     {
         public uint IsSetup;
-        public uint NumLocalProperty;
-        public uint NumCallTable;
-        public uint NumAsset;
-        public uint NumRandomContainer;
-        public uint NumResActionSlot;
-        public uint NumResAction;
-        public uint NumResActionTrigger;
-        public uint NumResProperty;
-        public uint NumResPropertyTrigger;
-        public uint NumResAlwaysTrigger;
-        public uint TriggerTablePos;
+        public int NumLocalProperty;
+        public int NumCallTable;
+        public int NumAsset;
+        public int NumRandomContainer;
+        public int NumResActionSlot;
+        public int NumResAction;
+        public int NumResActionTrigger;
+        public int NumResProperty;
+        public int NumResPropertyTrigger;
+        public int NumResAlwaysTrigger;
+        public UintPointer TriggerTablePos;
+
+        public bool IsSetupBool => IsSetup != 0;
     }
 }

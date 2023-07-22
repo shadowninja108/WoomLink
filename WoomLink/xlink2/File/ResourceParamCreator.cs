@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection.PortableExecutable;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using WoomLink.sead;
 using WoomLink.xlink2.File.Enum;
 using WoomLink.xlink2.File.Res;
-using WoomLink.xlink2.File.Res.Ex;
 using WoomLink.xlink2.File.Structs;
 using WoomLink.xlink2.Properties.Enum;
 
@@ -17,325 +13,382 @@ namespace WoomLink.xlink2.File
     {
         class BinAccessor
         {
-            public uint NumUser;
-            public Stream Stream;
-            public uint ResAssetParamTableOffset;
-            public uint NumAsset;
-            public uint NumTrigger;
-
-            public ResourceHeader ResourceHeader;
-
-            public string StringFromNameTable(uint pos)
-            {
-                using (Stream.TemporarySeek(ResourceHeader.NameTablePos + pos, SeekOrigin.Begin))
-                    return new BinaryReader(Stream).ReadUtf8Z();
-            }
+            public Pointer<ResourceHeader> Start;
+            /* Editor header */
+            /* Resource header but lower half on 32-bit platforms. */
+            public Pointer<ResAssetParam> ResAssetParamTable;
+            public int NumAsset;
+            public int NumTrigger;
         }   
 
-        public static void CreateParamAndSolveResource(RomResourceParam romParam, Stream stream, ParamDefineTable pdt, System system)
+        public static void CreateParamAndSolveResource(ref RomResourceParam romParam, Pointer<ResourceHeader> start, in ParamDefineTable pdt, System system)
         {
-            ResourceHeader header = new();
-            stream.Read(Utils.AsSpan(ref header));
-
-            romParam.Header = header;
-            romParam.UserDataHashes = stream.ReadArray<uint>(header.NumUser);
-            romParam.UserBinOffsets = stream.ReadArray<uint>(header.NumUser).ToArray();
-
-            romParam.NumUser = header.NumUser; 
-
-            BinAccessor accessor = new()
+            var userStart = start.AtEnd<uint>();
+            romParam.Data = start;
+            ref var header = ref start.Ref;
+            
+            if (header.NumUser > 0)
             {
-                NumUser = header.NumUser,
-                Stream = stream,
-                ResAssetParamTableOffset = (uint)(stream.Position + pdt.Header.Size),
-                NumAsset = pdt.Header.NumAssetParams,
-                NumTrigger = pdt.Header.NumTriggerParams
+                romParam.UserDataHashes = userStart;
+                romParam.UserDataPointers = userStart.Add(header.NumUser).AlignUp(Heap.PointerSize).Cast<Pointer<ResUserHeader>>();
+            }
+
+            romParam.NumUser = header.NumUser;
+
+            var accessor = new BinAccessor
+            {
+                Start = start,
+                ResAssetParamTable =
+                    userStart.Add(start.Ref.NumUser)
+                    .Cast<UintPointer>()
+                    .Add(start.Ref.NumUser)
+                    .AddBytes(pdt.TotalSize)
+                    .Cast<ResAssetParam>()
+                    .AlignUp(Heap.PointerSize),
+                NumAsset = pdt.NumTotalAssetParams,
+                NumTrigger = pdt.NumTriggerParams,
             };
 
-            accessor.ResourceHeader = header;
+            CreateCommonResourceParam(ref romParam.Common, accessor);
+            /* TODO: dumpRomResource */
+            SolveCommonResource(ref romParam.Common);
 
-            CreateCommonResourceParam(romParam, accessor);
-            SolveCommonResource(romParam, accessor, pdt);
-
-            romParam.UserBinParams = new UserBinParam[header.NumUser];
-
-            for (var i = 0; i < header.NumUser; i++)
+            for(var i = 0; i < romParam.NumUser; i++)
             {
-                var offset = romParam.UserBinOffsets[i];
-                using (stream.TemporarySeek(offset, SeekOrigin.Begin))
+                ref var pointer = ref romParam.UserDataPointers.Add(i).Ref;
+                pointer.PointerValue += start.PointerValue;
+
+                ref var user = ref pointer.Ref;
+                if(!user.IsSetupBool)
+                    SolveUserBin(pointer, ref romParam.Common, in pdt);
+            }
+
+            if (system.Field58)
+                SolveAboutGlobalProperty(ref romParam, in pdt, system);
+            
+            romParam.Setup = true;
+        }
+
+        private static void CreateCommonResourceParam(ref CommonResourceParam param, BinAccessor accessor)
+        {
+            /* TODO: support editor here */
+            ref var header = ref accessor.Start.Ref;
+            param.NumResParam = header.NumResParam;
+            param.NumResAssetParam = header.NumResAssetParam;
+            param.NumResTriggerOverwriteParam = header.NumResTriggerOverwriteParam;
+            param.NumLocalPropertyNameRefTable = header.NumLocalPropertyNameRefTable;
+            param.NumLocalPropertyEnumNameRefTable = header.NumLocalPropertyEnumNameRefTable;
+            param.NumDirectValueTable = header.NumDirectValueTable;
+            param.NumRandomTable = header.NumRandomTable;
+            param.NumCurveTable = header.NumCurveTable;
+            param.NumCurvePointTable = header.NumCurvePointTable;
+            param.ResAssetParamTable = accessor.ResAssetParamTable;
+
+            param.TriggerOverwriteParamTable = accessor.Start.AddBytes(header.TriggerOverwriteParamTablePos).Cast<ResTriggerOverwriteParam>();
+
+            var localPropertyNameRefTable = accessor.Start.AddBytes(header.LocalPropertyNameRefTablePos).Cast<Pointer<char>>();
+            param.LocalPropertyNameRefTable = localPropertyNameRefTable;
+            param.LocalPropertyEnumNameRefTable = localPropertyNameRefTable.Add(param.NumLocalPropertyNameRefTable);
+            param.DirectValueTable = param.LocalPropertyEnumNameRefTable.Add(param.NumLocalPropertyEnumNameRefTable).Cast<uint>();
+            param.RandomTable = param.DirectValueTable.Add(param.NumDirectValueTable).Cast<ResRandomCallTable>();
+            param.CurveTable = param.RandomTable.Add(param.NumRandomTable).Cast<ResCurveCallTable>();
+            param.CurvePointTable = param.CurveTable.Add(param.NumCurveTable).Cast<CurvePointTable>();
+
+            param.ExRegionLower = accessor.Start.AddBytes(header.ExRegionPos).Cast<ResUserHeader>();
+            param.ConditionTable = accessor.Start.AddBytes(header.ConditionTablePos).Cast<ResCondition>();
+            param.NameTable = accessor.Start.AddBytes(header.NameTablePos).PointerValue;
+        }
+        
+        private static void SolveCommonResource(ref CommonResourceParam param)
+        {
+            foreach (ref var x in param.LocalPropertyNameRefTableSpan)
+            {
+                x.PointerValue += param.NameTable;
+            }
+
+            foreach (ref var x in param.LocalPropertyEnumNameRefTableSpan)
+            {
+                x.PointerValue += param.NameTable;
+            }
+
+            foreach (ref var x in param.CurveTableSpan)
+            {
+                x.PropName.PointerValue += param.NameTable;
+            }
+
+            var conditionPtr = param.ConditionTable;
+            while (conditionPtr.PointerValue < param.NameTable)
+            {
+                ref var condition = ref conditionPtr.Ref;
+
+                if (condition.IsSwitch)
                 {
-                    UserBinParam param = new();
-                    CreateUserBinParam(param, accessor, pdt);
-                    SolveUserBin(param, romParam, pdt, accessor);
+                    var switchs = conditionPtr.GetForSwitch();
 
-                    var hash = romParam.UserDataHashes[i];
-                    var key = HashDb.FindByHash(hash);
-                    param.Key = key;
-
-                    romParam.UserBinParams[i] = param;
+                    if(switchs.Ref.PropertyType == PropertyType.Enum)
+                        switchs.GetStringValue().Ref.PointerValue += param.NameTable;
                 }
+
+                conditionPtr = conditionPtr.GetNext();
             }
         }
 
-        private static void CreateCommonResourceParam(CommonResourceParam param, BinAccessor accessor)
+        private static void SolveUserBin(Pointer<ResUserHeader> start, ref CommonResourceParam commonParam, in ParamDefineTable pdt)
         {
-            var stream = accessor.Stream;
-            using (stream.TemporarySeek(accessor.ResAssetParamTableOffset, SeekOrigin.Begin))
+            ref var header = ref start.Ref;
+            
+            /* TODO: why does this work??? */
+            header.NumLocalProperty &= ushort.MaxValue;
+            
+            CreateUserBinParam(out var userParam, start, in pdt);
+
+            foreach (ref var reff in userParam.LocalPropertyRefArrySpan)
             {
-                param.AssetParamsPos = stream.Position;
-                param.AssetParams = ResAssetParam.Read(stream, accessor.ResourceHeader.NumResAssetParam, accessor.NumAsset).ToArray();
+                reff.Name.PointerValue += commonParam.NameTable;
             }
 
-            param.TriggerOverwriteParamsPos = accessor.ResourceHeader.TriggerOverwriteParamTablePos;
-            using (stream.TemporarySeek(accessor.ResourceHeader.TriggerOverwriteParamTablePos, SeekOrigin.Begin))
+            foreach (ref var act in userParam.AssetCallTableSpan) 
             {
-                param.TriggerOverwriteParams = ResTriggerOverwriteParam
-                    .Read(stream, accessor.ResourceHeader.NumResTriggerOverwriteParam, accessor.NumTrigger).ToArray();
-            }
+                act.KeyName.PointerValue += commonParam.NameTable;
+                act.KeyNameHash = HashCrc32.CalcStringHash(act.KeyName.AsString());
 
-            using (stream.TemporarySeek(accessor.ResourceHeader.LocalPropertyNameRefTablePos, SeekOrigin.Begin))
-            {
-                param.LocalPropertyNameTable = 
-                    stream.ReadArray<uint>(accessor.ResourceHeader.NumLocalPropertyNameRefTable)
-                    .Select(accessor.StringFromNameTable).ToArray();
-                param.LocalPropertyEnumNameTable =
-                    stream.ReadArray<uint>(accessor.ResourceHeader.NumLocalPropertyEnumNameRefTable)
-                    .Select(accessor.StringFromNameTable).ToArray();
-                param.DirectValueTable =
-                    stream.ReadArray<uint>(accessor.ResourceHeader.NumDirectValueTable);
-                param.RandomTable =
-                    stream.ReadArray<ResRandomCallTable>(accessor.ResourceHeader.NumRandomTable);
-                param.CurveCallTable =
-                    stream.ReadArray<ResCurveCallTable>(accessor.ResourceHeader.NumCurveTable)
-                    .Select(x => new ResCurveCallTableEx(x)).ToArray();
-                param.CurvePointTable =
-                    stream.ReadArray<CurvePointTable>(accessor.ResourceHeader.NumCurvePointTable);
-            }
-
-            param.ConditionTablePos = accessor.ResourceHeader.ConditionTablePos;
-            using (stream.TemporarySeek(accessor.ResourceHeader.ConditionTablePos, SeekOrigin.Begin))
-            {
-                param.ConditionTable = ResCondition.Read(stream, accessor.ResourceHeader.NameTablePos).ToArray();
-            }
-
-            param.NameTablePos = accessor.ResourceHeader.NameTablePos;
-        }
-
-        /* */
-        private static void SolveCommonResource(CommonResourceParam param, BinAccessor accessor, ParamDefineTable pdt)
-        {
-            /* Normally LocalPropertyNameTable, LocalPropertyEnumNameTable, CurveCallTable and ConditionTable are relocated here. */
-
-            /* These are not normally done. */
-            foreach(var x in param.AssetParams)
-                x.Solve(accessor.Stream, param, pdt);
-            foreach(var x in param.TriggerOverwriteParams)
-                x.Solve(accessor.Stream, param, pdt);
-
-            foreach(var x in param.CurveCallTable)
-                x.Solve(accessor.Stream, param);
-
-            foreach(var x in param.ConditionTable)
-                x.Solve(accessor.Stream, param);
-        }
-
-        /* Normally this takes ResUserHeader, CommonResourceParam, ParamDefineTable. */
-        private static void SolveUserBin(UserBinParam userParam, CommonResourceParam commonParam, ParamDefineTable pdt, BinAccessor accessor)
-        {
-            /* Not normally done. */
-            for (var i = 0; i < userParam.UserParamTable.Length; i++)
-            {
-                var x = userParam.UserParamTable[i];
-                x.Solve(accessor.Stream, commonParam, pdt.UserParam[i]);
-            }
-
-            userParam.LocalPropertyStringTable = 
-                 userParam.LocalPropertyRefTable
-                 .Select(x => accessor.StringFromNameTable(x.NamePos))
-                 .ToArray();
-
-            userParam.AssetCallTableEx =
-                userParam.AssetCallTable
-                .Select(x => new ResAssetCallTableEx(x))
-                .ToArray();
-
-            userParam.ResActionSlotTableEx =
-                userParam.ResActionSlotTable
-                .Select(x => new ResActionSlotEx(x))
-                .ToArray();
-
-            userParam.ResActionTableEx =
-                userParam.ResActionTable
-                .Select(x => new ResActionEx(x))
-                .ToArray();
-
-            userParam.ResPropertyTableEx =
-                userParam.ResPropertyTable
-                .Select(x => new ResPropertyEx(x))
-                .ToArray();
-
-            userParam.ResPropertyTriggerTableEx =
-                userParam.ResPropertyTriggerTable
-                .Select(x => new ResPropertyTriggerEx(x))
-                .ToArray();
-
-            userParam.ResActionTriggerTableEx =
-                userParam.ResActionTriggerTable
-                .Select(x => new ResActionTriggerEx(x))
-                .ToArray();
-
-
-            foreach(var x in userParam.ResActionSlotTableEx)
-                x.Solve(accessor.Stream, commonParam);
-
-            foreach (var x in userParam.AssetCallTableEx)
-                x.Solve(accessor.Stream, commonParam, userParam, pdt);
-
-            foreach (var x in userParam.ResActionTableEx)
-                x.Solve(accessor.Stream, commonParam);
-
-            foreach (var x in userParam.ResPropertyTableEx)
-                x.Solve(accessor.Stream, commonParam);
-
-            foreach(var x in userParam.ResPropertyTriggerTableEx)
-                x.Solve(accessor.Stream, commonParam, userParam, pdt);
-
-            foreach (var x in userParam.ResActionTriggerTableEx)
-                x.Solve(accessor.Stream, commonParam, userParam, pdt);
-
-            if (userParam.ContainerParamTable != null)
-            {
-                foreach (var condition in userParam.ContainerParamTable)
-                    condition.Solve(accessor.Stream, commonParam);
-            }
-        }
-
-        /* A ResUserHeader would be passed instead of the accessor normally, but we aren't able to behave quite how they do. */
-        private static void CreateUserBinParam(UserBinParam param, BinAccessor accessor, ParamDefineTable pdt)
-        {
-            var stream = accessor.Stream;
-
-            using (stream.TemporarySeek())
-            {
-                stream.Read(Utils.AsSpan(ref param.Header));
-                param.LocalPropertyRefTable = stream.ReadArray<LocalPropertyRef>(param.Header.NumLocalProperty);
-                param.UserParamTable = ResParamEx.Read(stream, pdt.Header.NumUserParams).ToArray();
-                param.SortedAssetIdTable = stream.ReadArray<ushort>(param.Header.NumCallTable);
-
-                /* Align to 4 bytes. */
-                if ((param.Header.NumCallTable & 1) != 0)
-                    stream.Position += 2;
-
-                param.AssetCallTablePos = stream.Position;
-                param.AssetCallTable = stream.ReadArray<ResAssetCallTable>(param.Header.NumCallTable);
-
-                if (param.Header.NumCallTable != param.Header.NumAsset)
+                if (act.IsContainer)
                 {
-                    param.ContainerParamTablePos = stream.Position;
+                    if ((int)act.ParamPos == -1)
+                    {
+                        act.ParamPos = 0;
+                    }
+                    else
+                    {
+                        act.ParamPos += userParam.ContainerTablePos;
 
-                    param.ContainerParamTable =
-                        ResContainerParamEx.Read(stream, param.Header.NumCallTable - param.Header.NumAsset)
-                            .ToArray();
+                        var param = act.ParamAsContainer;
+
+                        if(param.Ref.Type != ContainerType.Switch
+#if XLINK_VER_THUNDER
+                            || param.Ref.Field1 != 0
+#endif
+                        )
+                        {
+                            if (param.Ref.Type == ContainerType.Mono)
+                            {
+                                var mono = param.GetForMono();
+                                mono.Ref.Unk1.PointerValue += commonParam.NameTable;
+                                mono.Ref.Unk2.PointerValue += commonParam.NameTable;
+                            }
+                        } 
+                        else
+                        {
+                            var switchs = param.GetForSwitch();
+                            Debug.Assert((switchs.Ref.WatchPropertyName.PointerValue & ~(ulong)uint.MaxValue) == 0);
+                            switchs.Ref.WatchPropertyName.PointerValue += commonParam.NameTable;
+                        }
+                    }
                 }
+                else
+                {
+                    act.ParamPos += commonParam.ResAssetParamTable.PointerValue;
+                }
+
+                ref var condition = ref act.Condition;
+                if ((int)condition.PointerValue == -1)
+                    condition = Pointer<ResCondition>.Null;
+                else
+                    condition.PointerValue += commonParam.ConditionTable.PointerValue;
             }
 
-            using (stream.TemporarySeek(param.Header.TriggerTablePos, SeekOrigin.Current))
+            foreach (ref var resActionSlot in userParam.ResActionSlotTableSpan)
             {
-                param.ResActionSlotTable = stream.ReadArray<ResActionSlot>(param.Header.NumResActionSlot);
-                param.ResActionTable = stream.ReadArray<ResAction>(param.Header.NumResAction);
-                param.ResActionTriggerTable = stream.ReadArray<ResActionTrigger>(param.Header.NumResActionTrigger);
-                param.ResPropertyTable = stream.ReadArray<ResProperty>(param.Header.NumResProperty);
-                param.ResPropertyTriggerTable = stream.ReadArray<ResPropertyTrigger>(param.Header.NumResPropertyTrigger);
-                param.ResAlwaysTriggerTable = stream.ReadArray<ResAlwaysTrigger>(param.Header.NumResAlwaysTrigger);
+                resActionSlot.Name.PointerValue += commonParam.NameTable;
             }
+
+            foreach (ref var action in userParam.ActionTableSpan)
+            {
+                action.Name.PointerValue += commonParam.NameTable;
+            }
+
+            foreach (ref var actionTrigger in userParam.ActionTriggerTableSpan)
+            {
+                actionTrigger.AssetCtbPos.PointerValue += userParam.AssetCallTable.PointerValue;
+
+                ref var overwriteParam = ref actionTrigger.OverwriteParam;
+                if ((int)overwriteParam.PointerValue == -1)
+                    overwriteParam = Pointer<ResTriggerOverwriteParam>.Null;
+                else
+                    overwriteParam.PointerValue += commonParam.TriggerOverwriteParamTable.PointerValue;
+
+                if (actionTrigger.TriggerType == ActionTriggerType.Three)
+                    actionTrigger.String.PointerValue += commonParam.NameTable;
+            }
+
+            foreach (ref var property in userParam.PropertyTableSpan)
+            {
+                property.WatchPropertyNamePos.PointerValue += commonParam.NameTable;
+            }
+
+            foreach (ref var resPropertyTrigger in userParam.ResPropertyTriggerTableSpan)
+            {
+                resPropertyTrigger.AssetCtb.PointerValue += userParam.AssetCallTable.PointerValue;
+
+                if ((int)resPropertyTrigger.Condition == -1)
+                    resPropertyTrigger.Condition = 0;
+                else
+                    resPropertyTrigger.Condition += (int)commonParam.ConditionTable.PointerValue;
+
+                ref var overwriteParam = ref resPropertyTrigger.OverwriteParam;
+                if ((int)overwriteParam.PointerValue == -1)
+                    overwriteParam.PointerValue = 0;
+                else
+                    overwriteParam.PointerValue += commonParam.TriggerOverwriteParamTable.PointerValue;
+            }
+
+            foreach (ref var resAlwaysTrigger in userParam.ResAlwaysTriggerTableSpan)
+            {
+                resAlwaysTrigger.AssetCtb.PointerValue += userParam.AssetCallTable.PointerValue;
+
+                ref var overwriteParam = ref resAlwaysTrigger.OverwriteParamPos;
+                if ((int)overwriteParam.PointerValue == -1)
+                    overwriteParam.PointerValue = 0;
+                else
+                    overwriteParam.PointerValue += commonParam.TriggerOverwriteParamTable.PointerValue;
+            }
+
+            header.IsSetup = 1;
         }
 
-        public static void SolveAboutGlobalProperty(RomResourceParam param, ParamDefineTable pdt, System system)
+        public static void CreateUserBinParam(out UserBinParam param, Pointer<ResUserHeader> start, in ParamDefineTable pdt)
         {
-            foreach (var x in param.CurveCallTable)
+            ref var header = ref start.Ref;
+
+            param = new();
+            param.ResUserHeader = start;
+            param.LocalPropertyRefArry = start.AtEnd<LocalPropertyRef>();
+            param.UserParamArry = param.LocalPropertyRefArry.Add(header.NumLocalProperty).Cast<ResParam>();
+            param.SortedAssetIdTable = param.UserParamArry.Add(pdt.NumAllParams).Cast<ushort>();
+
+            var assetCtb = param.SortedAssetIdTable.Add(header.NumCallTable).Cast<ResAssetCallTable>();
+            if ((header.NumCallTable & 1) != 0)
+                assetCtb.PointerValue += (UintPointer)Unsafe.SizeOf<ushort>();
+
+            param.AssetCallTable = assetCtb;
+
+            if (header.NumCallTable != header.NumAsset)
             {
-                if(!x.Internal.IsPropGlobalBool)
+                param.ContainerTablePos = param.AssetCallTable.Add(header.NumCallTable).PointerValue;
+            }
+
+            param.ResActionSlotTable = start.AddBytes(header.TriggerTablePos).Cast<ResActionSlot>();
+            param.ActionTable = param.ResActionSlotTable.Add(header.NumResActionSlot).Cast<ResAction>();
+            param.ActionTriggerTable = param.ActionTable.Add(header.NumResAction).Cast<ResActionTrigger>();
+            param.PropertyTable = param.ActionTriggerTable.Add(header.NumResActionTrigger).Cast<ResProperty>();
+            param.ResPropertyTriggerTable = param.PropertyTable.Add(header.NumResProperty).Cast<ResPropertyTrigger>();
+            param.ResAlwaysTriggerTable = param.ResPropertyTriggerTable.Add(header.NumResPropertyTrigger).Cast<ResAlwaysTrigger>();
+        }
+
+        public static void SolveAboutGlobalProperty(ref RomResourceParam param, in ParamDefineTable pdt, System system)
+        {
+            var curveCallTable = param.Common.CurveTable.AsSpan(param.Common.NumCurveTable);
+
+            foreach (ref var curveCall in curveCallTable)
+            {
+                if(!curveCall.IsPropGlobalBool)
                     continue;
 
-                if(x.Internal.LocalPropertyNameIdx == -1)
+                if(curveCall.LocalPropertyNameIdx != -1)
                     continue;
 
-                var idx = system.SearchGlobalPropertyIndex(x.PropName);
+                var idx = system.SearchGlobalPropertyIndex(curveCall.PropName.AsString());
 
                 if (idx == -1)
                 {
-                    throw new Exception($"Property {x.PropName} not found in curve");
+                    //throw new Exception($"Property {curveCall.PropName.AsString()} not found in curve");
+                    continue;
                 }
 
-                x.Internal.LocalPropertyNameIdx = (short)idx;
+                curveCall.LocalPropertyNameIdx = (short)idx;
             }
 
-            foreach (var x in param.UserBinParams)
+            var userBins = param.UserDataPointers.AsSpan(param.NumUser);
+            foreach (var userBin in userBins) 
             {
-                SolveUserBinAboutGlobalProperty(x, pdt, system);
+                SolveUserBinAboutGlobalProperty(userBin, in pdt, system);
             }
         }
 
-        private static void SolveUserBinAboutGlobalProperty(UserBinParam param, ParamDefineTable pdt, System system)
+        private static void SolveUserBinAboutGlobalProperty(Pointer<ResUserHeader> bin, in ParamDefineTable pdt, System system)
         {
-            foreach (var x in param.AssetCallTableEx)
+            CreateUserBinParam(out var param, bin, in pdt);
+
+            var callTable = param.AssetCallTableSpan;
+            foreach (ref var act in callTable)
             {
-                if (!x.Internal.IsContainer)
+                if (!act.IsContainer)
                     continue;
 
-                if(x.Internal.ParamStartPos == 0)
-                    continue;
-                
-                var container = x.ContainerParam;
-                if(container.Internal.Type != ContainerType.Switch || !container.SwitchValue.IsGlobal)
+                if((int)act.ParamPos == 0)
                     continue;
 
-                var idx = container.SwitchValue.LocalPropertyNameIdx;
+                var container = act.ParamAsContainer;
+                if(container.Ref.Type != ContainerType.Switch
+#if XLINK_VER_THUNDER
+                   || container.Ref.Field1 == 0
+#endif
+                )
+                    continue;
+
+                ref var switchs = ref container.GetForSwitch().Ref;
+                if(!switchs.IsGlobal)
+                    continue;
+
+                var idx = switchs.LocalPropertyNameIdx;
                 if (idx == -1)
                 {
-                    idx = (short)system.SearchGlobalPropertyIndex(container.WatchPropertyName);
+                    idx = (short) system.SearchGlobalPropertyIndex(switchs.WatchPropertyName.AsString());
 
                     if (idx == -1)
                     {
-                        // throw new Exception($"Property {container.WatchPropertyName} is not in container {x.KeyName}");
+                        //throw new Exception($"Property {switchs.WatchPropertyName.AsString()} is not in container {act.KeyName.AsString()}");
                         continue;
                     }
                 }
 
-                container.SwitchValue.LocalPropertyNameIdx = idx;
+                switchs.LocalPropertyNameIdx = idx;
                 
                 var def = system.GlobalPropertyDefinitions[idx];
                 if(def.Type != PropertyType.Enum)
                     continue;
 
-                var start = container.Internal.ChildrenStartIndex;
-                var end = container.Internal.ChildrenEndIndex;
+                var start = container.Ref.ChildrenStartIndex;
+                var end = container.Ref.ChildrenEndIndex;
 
                 if(start > end)
                     continue;
 
                 for (var i = start; i <= end; i++)
                 {
-                    var act = param.AssetCallTableEx[i];
-                    var actCondition = act.Condition;
+                    ref var childAct = ref callTable[i];
+                    var childActCond = childAct.Condition;
 
-                    if(actCondition == null)
+                    if(childActCond.PointerValue == 0)
                         continue;
 
-                    if(actCondition.NormalValue.IsSolvedBool)
+                    ref var childActCondSwitch = ref childActCond.GetForSwitch().Ref;
+                    if(childActCondSwitch.IsSolvedBool)
                         continue;
 
-                    actCondition.NormalValue.LocalPropertyEnumNameIdx = (short)((EnumPropertyDefinition)def).SearchEntryValueByKey(actCondition.ValueAsString);
-                    actCondition.NormalValue.IsSolved = 1;
+                    childActCondSwitch.LocalPropertyEnumNameIdx = (short) ((EnumPropertyDefinition)def).SearchEntryValueByKey(childActCond.GetForSwitch().GetStringValue().AsString());
+                    childActCondSwitch.IsSolved = 1;
                 }
             }
 
-            foreach (var x in param.ResPropertyTableEx)
+            var propertyTable = param.PropertyTableSpan;
+            var resPropertyTriggerTable = param.ResPropertyTriggerTableSpan;
+            foreach (ref var x in propertyTable)
             {
-                if(!x.Internal.IsGlobalBool)
+                if(!x.IsGlobalBool)
                     continue;
 
-                var idx = system.SearchGlobalPropertyIndex(x.WatchPropertyName);
+                var idx = system.SearchGlobalPropertyIndex(x.WatchPropertyNamePos.AsString());
 
                 if(idx == -1)
                     continue;
@@ -344,25 +397,26 @@ namespace WoomLink.xlink2.File
                 if(def.Type != PropertyType.Enum)
                     continue;
 
-                var start = x.Internal.TriggerStartIdx;
-                var end = x.Internal.TriggerEndIdx;
+                var start = x.TriggerStartIdx;
+                var end = x.TriggerEndIdx;
                 if(start > end)
                     continue;
 
-                for (var i = start; i <= end; i++)
+                for (var i = (int) start; i <= end; i++)
                 {
-                    var trigger = param.ResPropertyTriggerTableEx[i];
-                    var triggerCondition = trigger.Condition;
+                    ref var trigger = ref resPropertyTriggerTable[i];
+                    var triggerCondition = trigger.ConditionPtr;
 
-                    if(triggerCondition == null)
+                    if(triggerCondition.PointerValue == 0)
                         continue;
 
-                    if(triggerCondition.NormalValue.IsSolvedBool)
+                    ref var triggerConditionSwitch = ref triggerCondition.GetForSwitch().Ref;
+                    if (triggerConditionSwitch.IsSolvedBool)
                         continue;
 
-                    triggerCondition.NormalValue.LocalPropertyEnumNameIdx =
-                        (short)system.SearchGlobalPropertyIndex(triggerCondition.ValueAsString);
-                    triggerCondition.NormalValue.IsSolved = 1;
+                    triggerConditionSwitch.LocalPropertyEnumNameIdx =
+                        (short)system.SearchGlobalPropertyIndex(triggerCondition.GetForSwitch().GetStringValue().Ref.AsString());
+                    triggerConditionSwitch.IsSolved = 1;
                 }
             }
         }

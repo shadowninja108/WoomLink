@@ -1,26 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
+using WoomLink.xlink2.File.Structs;
 
 namespace WoomLink.xlink2.File.Res
 {
 
-    [StructLayout(LayoutKind.Sequential, Size = 0x14)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct ResCurveCallTable
     {
         public ushort CurvePointStartPos;
         public ushort NumPoint;
         public ushort CurveType;
         public ushort IsPropGlobal;
-        public uint PropName;
+        public Pointer<char> PropName;
         public uint PropIdx;
         public short LocalPropertyNameIdx;
         public ushort Padding;
 
+        public Pointer<CurvePointTable> CurvePoint => Pointer<CurvePointTable>.As(CurvePointStartPos);
         public bool IsPropGlobalBool => IsPropGlobal != 0;
     }
 }

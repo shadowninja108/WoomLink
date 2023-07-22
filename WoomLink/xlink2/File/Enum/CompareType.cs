@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace WoomLink.xlink2.File.Enum
+﻿namespace WoomLink.xlink2.File.Enum
 {
-    public enum CompareType : uint
+    public enum CompareType :
+#if XLINK_VER_BLITZ
+        uint
+#elif XLINK_VER_THUNDER
+        byte
+#else
+#error Invalid XLink target.
+#endif
     {
         Equal = 0x0,
         GreaterThan = 0x1,
