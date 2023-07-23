@@ -39,7 +39,8 @@ namespace WoomLink
 
             void SetupSystem(xlink2.System system, Pointer<byte> resource, PropertyDefinition[] globalProp)
             {
-                system.LoadResource(resource.PointerValue);
+                var r = system.LoadResource(resource.PointerValue);
+                Debug.Assert(r);
                 system.AllocGlobalProperty((uint)globalProp.Length);
                 for (uint i = 0; i < globalProp.Length; i++)
                 {
