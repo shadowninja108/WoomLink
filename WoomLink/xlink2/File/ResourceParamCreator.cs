@@ -180,7 +180,6 @@ namespace WoomLink.xlink2.File
                         else
                         {
                             var switchs = param.GetForSwitch();
-                            Debug.Assert((switchs.Ref.WatchPropertyName.PointerValue & ~(ulong)uint.MaxValue) == 0);
                             switchs.Ref.WatchPropertyName.PointerValue += commonParam.NameTable;
                         }
                     }
@@ -230,10 +229,10 @@ namespace WoomLink.xlink2.File
             {
                 resPropertyTrigger.AssetCtb.PointerValue += userParam.AssetCallTable.PointerValue;
 
-                if ((int)resPropertyTrigger.Condition == -1)
-                    resPropertyTrigger.Condition = 0;
+                if ((int)resPropertyTrigger.Condition.PointerValue == -1)
+                    resPropertyTrigger.Condition = Pointer<ResCondition>.Null;
                 else
-                    resPropertyTrigger.Condition += (int)commonParam.ConditionTable.PointerValue;
+                    resPropertyTrigger.Condition.PointerValue += commonParam.ConditionTable.PointerValue;
 
                 ref var overwriteParam = ref resPropertyTrigger.OverwriteParam;
                 if ((int)overwriteParam.PointerValue == -1)
@@ -405,7 +404,7 @@ namespace WoomLink.xlink2.File
                 for (var i = (int) start; i <= end; i++)
                 {
                     ref var trigger = ref resPropertyTriggerTable[i];
-                    var triggerCondition = trigger.ConditionPtr;
+                    var triggerCondition = trigger.Condition;
 
                     if(triggerCondition.PointerValue == 0)
                         continue;
