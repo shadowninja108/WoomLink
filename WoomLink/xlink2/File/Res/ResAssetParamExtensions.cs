@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
+using WoomLink.Ex;
 
 namespace WoomLink.xlink2.File.Res
 {

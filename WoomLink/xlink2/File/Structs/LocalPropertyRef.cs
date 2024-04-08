@@ -1,4 +1,6 @@
-﻿namespace WoomLink.xlink2.File.Structs
+﻿using WoomLink.Ex;
+
+namespace WoomLink.xlink2.File.Structs
 {
     public struct LocalPropertyRef
     {

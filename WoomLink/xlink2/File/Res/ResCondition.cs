@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 using WoomLink.xlink2.File.Enum;
 
 namespace WoomLink.xlink2.File.Res
@@ -35,17 +36,29 @@ namespace WoomLink.xlink2.File.Res
             public short LocalPropertyEnumNameIdx;
             public byte IsSolved;
             public byte IsGlobal;
-#elif XLINK_VER_THUNDER
+#elif XLINK_VER_PARK
+            public PropertyType PropertyType;
+            public CompareType CompareType;
+            public byte IsSolved;
+            public byte IsGlobal;
+            public uint SmallValue;
+            public int LocalPropertyEnumNameIdx;
+#elif XLINK_VER_THUNDER || XLINK_VER_EXKING
             public PropertyType PropertyType;
             public CompareType CompareType;
             public byte IsSolved;
             public byte IsGlobal;
             public int LocalPropertyEnumNameIdx;
             public uint SmallValue;
+#else
+#error Invalid XLink version target.
 #endif
 
             public bool IsSolvedBool => IsSolved != 0;
             public bool IsGlobalBool => IsGlobal != 0;
+
+            public int IntValue => (int)SmallValue;
+            public float FloatValue => BitConverter.UInt32BitsToSingle(SmallValue);
         }
 
         [StructLayout(LayoutKind.Sequential)]

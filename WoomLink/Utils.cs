@@ -11,6 +11,14 @@ namespace WoomLink
 {
     public static class Utils
     {
+        public static ushort ToUShort(this bool value)
+        {
+            if (value)
+                return 1;
+            else
+                return 0;
+        }
+
         public static Span<byte> AsSpan<T>(ref T val) where T : unmanaged
         {
             Span<T> valSpan = MemoryMarshal.CreateSpan(ref val, 1);
@@ -58,6 +66,14 @@ namespace WoomLink
             long ret = stream.Position;
             stream.Seek(offset, origin);
             return new TemporarySeekHandle(stream, ret);
+        }
+
+        public static byte ReadByteStrict(this Stream stream)
+        {
+            var i = stream.ReadByte();
+            if (i < 0)
+                throw new Exception("");
+            return (byte)i;
         }
 
         public static uint ReadUInt24(this BinaryReader reader)
@@ -237,6 +253,18 @@ namespace WoomLink
             return (num + (align - 1)) & ~(align - 1);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ushort ByteReversed(this ushort value)
+        {
+            return (ushort)((value & 0xFFU) << 8 | (value & 0xFF00U) >> 8);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static uint ByteReversed(this uint value)
+        {
+            return (value & 0x000000FFU) << 24 | (value & 0x0000FF00U) << 8 |
+                   (value & 0x00FF0000U) >> 8 | (value & 0xFF000000U) >> 24;
+        }
 
         public static void MaybeAdjustEndianness<T>(Type type, Span<T> data, Endianness endianness) where T : struct
         {

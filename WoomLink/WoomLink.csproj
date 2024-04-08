@@ -1,30 +1,71 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
-    <Configurations>Debug;Release;Debug (Thunder);Release (Thunder)</Configurations>
+    <Configurations>Debug (Blitz);Release (Blitz);Debug (Thunder);Release (Thunder);Debug (Park);Release (Park);Release (EX-King);Debug (EX-King)</Configurations>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Blitz)|AnyCPU'">
     <LangVersion>preview</LangVersion>
-    <DefineConstants>$(DefineConstants);XLINK_VER_BLITZ;XLINK_ARCH_32</DefineConstants>
+    <DefineConstants>$(DefineConstants);XLINK_ARCH_32;XLINK_VER_BLITZ;DEBUG</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>False</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Park)|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_PARK;XLINK_ARCH_32;DEBUG</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Thunder)|AnyCPU'">
     <LangVersion>preview</LangVersion>
-    <DefineConstants>$(DefineConstants);XLINK_VER_THUNDER;XLINK_ARCH_64</DefineConstants>
+    <DefineConstants>$(DefineConstants);XLINK_ARCH_64;XLINK_VER_THUNDER;DEBUG</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (EX-King)|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_ARCH_64;XLINK_VER_EXKING;DEBUG</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>False</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Blitz)|AnyCPU'">
     <LangVersion>preview</LangVersion>
     <DefineConstants>$(DefineConstants);XLINK_VER_BLITZ;XLINK_ARCH_32</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Park)|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_PARK;XLINK_ARCH_32</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>True</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Thunder)|AnyCPU'">
     <LangVersion>preview</LangVersion>
     <DefineConstants>$(DefineConstants);XLINK_VER_THUNDER;XLINK_ARCH_64</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>True</Optimize>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (EX-King)|AnyCPU'">
+    <LangVersion>preview</LangVersion>
+    <DefineConstants>$(DefineConstants);XLINK_VER_EXKING;XLINK_ARCH_64</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZstdNet" Version="1.4.5" />
+  </ItemGroup>
 
 </Project>

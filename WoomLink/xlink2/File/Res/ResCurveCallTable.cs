@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using WoomLink.Ex;
 using WoomLink.xlink2.File.Structs;
 
 namespace WoomLink.xlink2.File.Res

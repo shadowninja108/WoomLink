@@ -7,8 +7,9 @@
         String = 0x1,
         Curve = 0x2,
         Unk3 = 0x3,
+        /* Appears to be some sort of pointer type. Only observed in ArrangeGroupParams in the User params. */
         Unk4 = 0x4,
-        Unk5 = 0x5,
+        Bitfield = 0x5,
         Unk6 = 0x6,
         Unk7 = 0x7,
         Unk8 = 0x8,

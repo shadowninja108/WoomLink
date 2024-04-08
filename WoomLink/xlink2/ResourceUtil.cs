@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using WoomLink.xlink2.File;
+﻿using WoomLink.Ex;
 using WoomLink.xlink2.File.Enum;
 using WoomLink.xlink2.File.Res;
 
@@ -17,7 +12,7 @@ namespace WoomLink.xlink2
                 return Pointer<ResContainerParam>.Null;
 
             var containerPtr = act.ParamAsContainer;
-            if(containerPtr.IsNull())
+            if(containerPtr.IsNull)
                 return Pointer<ResContainerParam>.Null;
             
             if(containerPtr.Ref.Type != ContainerType.Switch)

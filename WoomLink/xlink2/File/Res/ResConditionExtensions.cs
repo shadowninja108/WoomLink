@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using WoomLink.Ex;
 using WoomLink.xlink2.File.Enum;
 using static WoomLink.xlink2.File.Res.ResCondition;
 
@@ -54,17 +55,6 @@ namespace WoomLink.xlink2.File.Res
 #endif
         }
 
-        public static Pointer<int> GetIntValue(this Pointer<ForSwitch> pointer)
-        {
-            Debug.Assert(pointer.Ref.PropertyType == PropertyType.S32);
-            return pointer.AtEnd<int>();
-        }
-
-        public static Pointer<float> GetFloatValue(this Pointer<ForSwitch> pointer)
-        {
-            Debug.Assert(pointer.Ref.PropertyType == PropertyType.F32);
-            return pointer.AtEnd<float>();
-        }
 
         public static Pointer<ResCondition> GetNext(this Pointer<ResCondition> pointer)
         {
@@ -72,34 +62,28 @@ namespace WoomLink.xlink2.File.Res
             if (condition.IsRandom)
             {
                 var next = pointer.GetForRandom().AtEnd<ResCondition>();
-                //Debug.Assert(next.PointerValue - pointer.PointerValue == 0x8);
                 return next;
             }
             if (condition.IsSequence)
             {
                 var next = pointer.GetForSequence().AtEnd<ResCondition>();
-                //Debug.Assert(next.PointerValue - pointer.PointerValue == 0x8);
                 return next;
             }
             if (condition.IsSwitch)
             {
                 var switchs = pointer.GetForSwitch();
                 var next = switchs.GetNext();
-               //if(switchs.Ref.PropertyType == PropertyType.Enum)
-               //    Debug.Assert(next.PointerValue - pointer.PointerValue == 0x18);
-               //else
-               //    Debug.Assert(next.PointerValue - pointer.PointerValue == 0x10);
                 return next;
             }
             if (condition.IsBlend)
             {
                 var next = pointer.GetForBlend().AtEnd<ResCondition>();
-                //Debug.Assert(next.PointerValue - pointer.PointerValue == 0x10);
                 return next;
             }
 
-            /* Yes this is what they do. */
             Debug.Assert(false);
+
+            /* Yes this is what they do. */
             return pointer;
         }
     }

@@ -7,7 +7,14 @@ namespace WoomLink.xlink2.File.Res
     public struct ResUserHeader
     {
         public uint IsSetup;
+#if XLINK_VER_BLITZ || XLINK_VER_PARK || XLINK_VER_THUNDER
         public int NumLocalProperty;
+#elif XLINK_VER_EXKING
+        public short NumLocalProperty;
+        public short Unk;
+#else
+#error Invalid XLink version target.
+#endif
         public int NumCallTable;
         public int NumAsset;
         public int NumRandomContainer;

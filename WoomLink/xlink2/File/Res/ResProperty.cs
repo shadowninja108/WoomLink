@@ -1,4 +1,6 @@
-﻿namespace WoomLink.xlink2.File.Res
+﻿using WoomLink.Ex;
+
+namespace WoomLink.xlink2.File.Res
 {
     public struct ResProperty
     {

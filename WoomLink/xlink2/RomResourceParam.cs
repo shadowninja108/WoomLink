@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using WoomLink.xlink2.File;
+using WoomLink.Ex;
 using WoomLink.xlink2.File.Res;
 using WoomLink.xlink2.File.Structs;
 
@@ -18,12 +18,24 @@ namespace WoomLink.xlink2
         public Span<uint> UserDataHashesSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => UserDataHashes.AsSpan(NumUser);
+            get
+            {
+                if (NumUser <= 0) return [];
+
+                return UserDataHashes.AsSpan(NumUser);
+
+            }
         }
         public Span<Pointer<ResUserHeader>> UserDataPointersSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => UserDataPointers.AsSpan(NumUser);
+            get
+            {
+                if (NumUser <= 0) return [];
+
+                return UserDataPointers.AsSpan(NumUser);
+
+            }
         }
     }
 }

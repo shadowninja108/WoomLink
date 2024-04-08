@@ -1,4 +1,4 @@
-﻿namespace WoomLink.xlink2
+﻿namespace WoomLink.xlink2.User.Instance
 {
     public class UserInstanceParam
     {

@@ -2,7 +2,15 @@
 {
     public struct ResEset
     {
-        public ushort Field0;
-        public ushort Field2;
+        public short ResourceIndex;
+        public short EmitterId;
+
+        public ResEset()
+        {
+            ResourceIndex = -1;
+            EmitterId = -1;
+        }
+
+        public readonly bool IsInvalid => ResourceIndex == -1 && EmitterId == -1;
     }
 }

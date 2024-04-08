@@ -1,12 +1,15 @@
 ﻿using System;
 using WoomLink.xlink2.File;
 
-namespace WoomLink.xlink2
+namespace WoomLink.xlink2.User.Instance
 {
     public class UserInstanceELink : UserInstance
     {
-        private byte DefaultGroup;
+        /* Callback */
         private int FieldF8 = -1;
+        private byte DefaultGroup = 0;
+        public PtclResourceAccessorELink? PtclAccessor = null;
+
         public UserInstanceELink(CreateArg arg, System system, User user /* heap */) : base(arg, system, user)
         {
         }
@@ -45,15 +48,10 @@ namespace WoomLink.xlink2
 
         public override void OnSetupInstanceParam(ResMode mode)
         {
-            InitModelAssetConnection(mode, ref User.GetSystem().GetParamDefineTable());
+            InitModelAssetConnection(mode, in User.GetSystem().GetParamDefineTable());
         }
 
-        public override void InitModelAssetConnection(ResMode mode, ref ParamDefineTable paramDefine)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void DoEventActivatedCallback(Locator locator, Event e)
+        public override void InitModelAssetConnection(ResMode mode, in ParamDefineTable paramDefine)
         {
             throw new NotImplementedException();
         }

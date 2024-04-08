@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using WoomLink.Ex;
 using WoomLink.xlink2.File.Enum;
 using WoomLink.xlink2.File.Structs;
 
@@ -8,7 +9,7 @@ namespace WoomLink.xlink2.File
 {
     public struct ParamDefineTable
     {
-        public int NumAllParams;
+        public int NumTotalUserParams;
         public int NumTotalAssetParams;
         public int NumTriggerParams;
         public Pointer<ParamDefine> UserParam;
@@ -23,19 +24,19 @@ namespace WoomLink.xlink2.File
         public bool Initialized;
 
 
-        public Span<ParamDefine> UserParamSpan
+        public readonly Span<ParamDefine> UserParamSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => UserParam.AsSpan(NumAllParams);
+            get => UserParam.AsSpan(NumTotalUserParams);
         }
 
-        public Span<ParamDefine> AssetParamSpan
+        public readonly Span<ParamDefine> AssetParamSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => AssetParam.AsSpan(NumTotalAssetParams);
         }
 
-        public Span<ParamDefine> TriggerParamSpan
+        public readonly Span<ParamDefine> TriggerParamSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => TriggerParam.AsSpan(NumTriggerParams);
@@ -46,13 +47,12 @@ namespace WoomLink.xlink2.File
             if (Initialized) 
                 return;
 
-            var headerPtr = Pointer<ParamDefineTableHeader>.As(data);
-            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), ref headerPtr.Ref, Endianness.Big);
+            var headerPtr = Pointer<ParamDefineTableHeader>.As(data); 
             ref var header = ref headerPtr.Ref;
 
             TotalSize = header.Size;
             var totalUserParams = header.NumTotalUserParams;
-            NumAllParams = totalUserParams;
+            NumTotalUserParams = totalUserParams;
             NumNonUserParams = (int)(totalUserParams - userParamNum);
             NumUserParams = (int)userParamNum;
             var totalAssetParams = header.NumTotalAssetParams;
@@ -61,15 +61,11 @@ namespace WoomLink.xlink2.File
             NumUserAssetParams = numUserAssetParams;
             NumStandardAssetParams = totalAssetParams - numUserAssetParams;
             NumTriggerParams = header.NumTriggerParams;
-            var startOfParams = headerPtr.AtEnd<ParamDefine>().AlignUp(Heap.PointerSize);
+            var startOfParams = headerPtr.AtEnd<ParamDefine>().AlignUp(FakeHeap.PointerSize);
             UserParam = startOfParams;
             AssetParam = UserParam.Add(header.NumTotalUserParams);
             TriggerParam = AssetParam.Add(header.NumTotalAssetParams);
             StringTable = TriggerParam.Add(header.NumTriggerParams).Cast<char>();
-
-            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), UserParamSpan, Endianness.Big);
-            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), AssetParamSpan, Endianness.Big);
-            //Utils.MaybeAdjustEndianness(typeof(ResourceHeader), TriggerParamSpan, Endianness.Big);
 
             Debug.Assert(StringTable.PointerValue < data + (ulong)header.Size);
 
@@ -99,21 +95,36 @@ namespace WoomLink.xlink2.File
             Initialized = true;
         }
 
-        public string GetAssetParamDefaultValueString(uint reff)
+        public void Reset()
         {
-            if (NumTotalAssetParams <= reff)
-                return "";
-            return AssetParamSpan[(int)reff].DefaultValueAsString.AsString();
+            NumTotalUserParams = 0;
+            NumTotalAssetParams = 0;
+            NumTriggerParams = 0;
+            TotalSize = 0;
+            Initialized = false;
+            NumStandardAssetParams = 0;
+            TriggerParam = Pointer<ParamDefine>.Null;
+            StringTable = Pointer<char>.Null;
+            NumUserAssetParams = 0;
+            UserParam = Pointer<ParamDefine>.Null;
+            AssetParam = Pointer<ParamDefine>.Null;
         }
 
-        public int GetAssetParamDefaultValueInt(uint reff)
+        public readonly Pointer<char> GetAssetParamDefaultValueString(uint reff)
+        {
+            if (NumTotalAssetParams <= reff)
+                return FakeHeap.EmptyString;
+            return AssetParamSpan[(int)reff].DefaultValueAsString;
+        }
+
+        public readonly int GetAssetParamDefaultValueInt(uint reff)
         {
             if (NumTotalAssetParams <= reff)
                 return 0;
             return AssetParamSpan[(int)reff].DefaultValueAsInt;
         }
 
-        public float GetAssetParamDefaultValueFloat(uint reff)
+        public readonly float GetAssetParamDefaultValueFloat(uint reff)
         {
             if (NumTotalAssetParams <= reff)
                 return 0;

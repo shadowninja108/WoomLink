@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using WoomLink.Ex;
 
 namespace WoomLink.xlink2.File.Res
 {
@@ -7,7 +8,7 @@ namespace WoomLink.xlink2.File.Res
     public struct ResAssetCallTable
     {
         public Pointer<char> KeyName;
-        public ushort AssetId;
+        public short AssetId;
         public ushort Flag;
         public int Duration;
         public int ParentIndex;
@@ -17,10 +18,10 @@ namespace WoomLink.xlink2.File.Res
         public UintPointer ParamPos;
         public Pointer<ResCondition> Condition;
 
-        public Pointer<ResContainerParam> ParamAsContainer => Pointer<ResContainerParam>.As(ParamPos);
-        public Pointer<ResAssetParam> ParamAsAsset => Pointer<ResAssetParam>.As(ParamPos);
+        public readonly Pointer<ResContainerParam> ParamAsContainer => Pointer<ResContainerParam>.As(ParamPos);
+        public readonly Pointer<ResAssetParam> ParamAsAsset => Pointer<ResAssetParam>.As(ParamPos);
 
-        public bool IsContainer => (Flag & 1) != 0;
-        public bool IsSolvedBool => IsSolved != 0;
+        public readonly bool IsContainer => (Flag & 1) != 0;
+        public readonly bool IsSolvedBool => IsSolved != 0;
     }
 }

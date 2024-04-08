@@ -1,25 +1,26 @@
 ﻿using System;
+using WoomLink.Ex;
 using WoomLink.xlink2.File;
 using WoomLink.xlink2.File.Enum;
 using WoomLink.xlink2.File.Res;
 using WoomLink.xlink2.File.Structs;
 using WoomLink.xlink2.Properties.Enum;
 
-namespace WoomLink.xlink2
+namespace WoomLink.xlink2.User.Resource
 {
     public abstract class UserResource
     {
         public User User;
         public ResMode ResMode;
-        public UserResourceParam[] Params;
+        public UserResourceParam?[] Params;
 
-        public UserResourceParam NormalParam
+        public UserResourceParam? NormalParam
         {
             get => Params[(int)ResMode.Normal];
             set => Params[(int)ResMode.Normal] = value;
         }
 
-        public UserResourceParam CurrentParam
+        public UserResourceParam? CurrentParam
         {
             get => Params[(int)ResMode];
             set => Params[(int)ResMode] = value;
@@ -48,7 +49,7 @@ namespace WoomLink.xlink2
 
         private void SetupRomResourceParam( /* heap */)
         {
-            if (NormalParam == null)
+            if (NormalParam != null)
                 return;
 
             var param = AllocResourceParam();
@@ -56,7 +57,7 @@ namespace WoomLink.xlink2
 
             var resourceBuffer = GetSystem().ResourceBuffer;
             var user = resourceBuffer.SearchResUserHeader(User.Name);
-            if (!user.IsNull())
+            if (!user.IsNull)
             {
                 ref var resParam = ref resourceBuffer.RSP.Common;
                 SetupResourceParam(
@@ -101,7 +102,7 @@ namespace WoomLink.xlink2
             return false;
         }
 
-        private static void SolveNeedObserveFlag(UserResourceParam param)
+        protected static void SolveNeedObserveFlag(UserResourceParam param)
         {
             if(param.User.Header.NumCallTable == 0)
                 return;
@@ -123,7 +124,8 @@ namespace WoomLink.xlink2
         {
             ref var header = ref headerPtr.Ref;
             ResourceParamCreator.CreateUserBinParam(out param.User, headerPtr, in pdt);
-            param.Common = commonParam;
+            /* Normally the common param pointer would be assigned here, but we can't really arrange things like that for right now. */
+            //param.Common = commonParam;
 
             if (commonParam.NumLocalPropertyNameRefTable > 0)
             {
@@ -144,7 +146,7 @@ namespace WoomLink.xlink2
 
             param.Accessor.HeaderPointer = headerPtr;
 
-            if (User.PropertyDefinitionTable.Length > 0)
+            if (User.PropertyDefinitionTable?.Length > 0)
             {
                 for (sbyte i = 0; i < User.PropertyDefinitionTable.Length; i++)
                 {
@@ -176,7 +178,7 @@ namespace WoomLink.xlink2
                 {
                     ref var act = ref actSpan[actIdx];
                     var containerParam = ResourceUtil.GetResSwitchContainerParam(in act);
-                    if(containerParam.IsNull())
+                    if(containerParam.IsNull)
                         continue;
 
                     var switchContainerParam = containerParam.GetForSwitch();
@@ -204,7 +206,7 @@ namespace WoomLink.xlink2
                     for(var childIdx = start; childIdx < end; childIdx++)
                     {
                         ref var childAct = ref actSpan[childIdx];
-                        if(childAct.Condition.IsNull())
+                        if(childAct.Condition.IsNull)
                             continue;
 
                         var enumName = commonParam.LocalPropertyEnumNameRefTableSpan[childAct.Condition.GetForSwitch().Ref.LocalPropertyEnumNameIdx];
@@ -251,7 +253,7 @@ namespace WoomLink.xlink2
                 var needToObserve = false;
                 var containerPtr = ResourceUtil.GetResSwitchContainerParam(in parentCall);
 
-                if (!containerPtr.IsNull() && containerPtr.Ref.ChildrenStartIndex > 0)
+                if (!containerPtr.IsNull && containerPtr.Ref.ChildrenStartIndex >= 0)
                 {
                     ref var container = ref containerPtr.Ref;
 
@@ -266,24 +268,106 @@ namespace WoomLink.xlink2
                     }
                 }
 
-                if (!needToObserve && parentCall.Duration > 0)
+                if (!needToObserve && parentCall.Duration >= 0)
                 {
-                    assetCall.Flags &= ~2;
+                    assetCall.IsNeedObserve = false;
                     return false;
                 }
             }
             else
             {
-                if (parentCall.Duration > 0)
+                if (parentCall.Duration >= 0)
                 {
-                    if ((assetCall.Flags & 1) == 0)
+                    if (!assetCall.IsNeedFade)
                     {
-                        assetCall.Flags &= ~2;
+                        assetCall.IsNeedObserve = false;
                         return false;
                     }
                 }
             }
-            assetCall.Flags |= 2;
+
+            assetCall.IsNeedObserve = true;
+            return true;
+        }
+
+        public bool SearchAssetCallTableByName(ref Locator lco, string name)
+        {
+            lco.Act = Pointer<ResAssetCallTable>.Null;
+
+            var param = CurrentParam;
+            if (param == null)
+                return false;
+            if (!param.Setup)
+                return false;
+
+            var acts = param.User.AssetCallTable;
+            if (param.User.Header.NumCallTable < 1)
+                return false;
+
+            var sortedAssetIdTable = param.User.SortedAssetIdTableSpan;
+            var start = 0;
+            var end = param.User.Header.NumCallTable - 1;
+
+            Pointer<ResAssetCallTable> actPtr;
+            while (true)
+            {
+                var mid = (start + end) / 2;
+                actPtr = acts.Add(sortedAssetIdTable[mid]);
+
+                /* ??? */
+                if (actPtr.IsNull)
+                    break;
+
+                ref var act = ref actPtr.Ref;
+                var cmp = string.Compare(act.KeyName.AsString(), name, StringComparison.Ordinal);
+                if (cmp == 0)
+                    break;
+
+                switch (cmp)
+                {
+                    case < 0:
+                        end = mid - 1;
+                        break;
+                    case > 0:
+                        start = mid + 1;
+                        break;
+                }
+
+                if (start > end)
+                {
+                    actPtr = Pointer<ResAssetCallTable>.Null;
+                    break;
+                }
+            }
+
+            lco.Act = actPtr;
+            return !actPtr.IsNull;
+        }
+
+        public bool SearchAssetCallTableByHash(ref Locator lco, uint hash)
+        {
+            var param = CurrentParam;
+            if (param == null)
+                return false;
+            if (!param.Setup)
+                return false;
+
+            var count = param.User.Header.NumCallTable;
+            if(count == 0) 
+                return false;
+
+            var ptr = param.User.AssetCallTable;
+            var i = 0;
+            while (ptr.Ref.KeyNameHash != hash)
+            {
+                i++;
+                ptr = ptr.Add(1);
+
+                if (i >= count)
+                    return false;
+            }
+
+            lco.Act = ptr;
             return true;
         }
 

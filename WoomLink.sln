@@ -8,17 +8,29 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug (Blitz)|Any CPU = Debug (Blitz)|Any CPU
+		Debug (EX-King)|Any CPU = Debug (EX-King)|Any CPU
+		Debug (Park)|Any CPU = Debug (Park)|Any CPU
 		Debug (Thunder)|Any CPU = Debug (Thunder)|Any CPU
 		Release (Blitz)|Any CPU = Release (Blitz)|Any CPU
+		Release (EX-King)|Any CPU = Release (EX-King)|Any CPU
+		Release (Park)|Any CPU = Release (Park)|Any CPU
 		Release (Thunder)|Any CPU = Release (Thunder)|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Blitz)|Any CPU.ActiveCfg = Debug|Any CPU
-		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Blitz)|Any CPU.Build.0 = Debug|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Blitz)|Any CPU.ActiveCfg = Debug (Blitz)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Blitz)|Any CPU.Build.0 = Debug (Blitz)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (EX-King)|Any CPU.ActiveCfg = Debug (EX-King)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (EX-King)|Any CPU.Build.0 = Debug (EX-King)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Park)|Any CPU.ActiveCfg = Debug (Park)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Park)|Any CPU.Build.0 = Debug (Park)|Any CPU
 		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Thunder)|Any CPU.ActiveCfg = Debug (Thunder)|Any CPU
 		{13200882-62FD-428C-8FEF-B082439FB768}.Debug (Thunder)|Any CPU.Build.0 = Debug (Thunder)|Any CPU
 		{13200882-62FD-428C-8FEF-B082439FB768}.Release (Blitz)|Any CPU.ActiveCfg = Release|Any CPU
 		{13200882-62FD-428C-8FEF-B082439FB768}.Release (Blitz)|Any CPU.Build.0 = Release|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Release (EX-King)|Any CPU.ActiveCfg = Release (EX-King)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Release (EX-King)|Any CPU.Build.0 = Release (EX-King)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Release (Park)|Any CPU.ActiveCfg = Release (Park)|Any CPU
+		{13200882-62FD-428C-8FEF-B082439FB768}.Release (Park)|Any CPU.Build.0 = Release (Park)|Any CPU
 		{13200882-62FD-428C-8FEF-B082439FB768}.Release (Thunder)|Any CPU.ActiveCfg = Release (Thunder)|Any CPU
 		{13200882-62FD-428C-8FEF-B082439FB768}.Release (Thunder)|Any CPU.Build.0 = Release (Thunder)|Any CPU
 	EndGlobalSection

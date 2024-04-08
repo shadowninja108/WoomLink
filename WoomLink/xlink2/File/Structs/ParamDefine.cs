@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using WoomLink.Ex;
 using WoomLink.xlink2.File.Enum;
 
 namespace WoomLink.xlink2.File.Structs

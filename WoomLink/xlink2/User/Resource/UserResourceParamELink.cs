@@ -1,4 +1,4 @@
-﻿namespace WoomLink.xlink2
+﻿namespace WoomLink.xlink2.User.Resource
 {
     public class UserResourceParamELink : UserResourceParam
     {

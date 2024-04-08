@@ -7,6 +7,6 @@
         Bool = 2,
         Enum = 3,
         String = 4,
-        Byte = 5,
+        Bitfield = 5,
     }
 }

@@ -25,7 +25,7 @@ namespace WoomLink.Ex
                 bool foundEnd = false;
                 while(!reader.EndOfStream)
                 {
-                    var line = reader.ReadLine().Trim();
+                    var line = reader.ReadLine()!.Trim();
 
                     if (line == "};" || line == "}")
                     {

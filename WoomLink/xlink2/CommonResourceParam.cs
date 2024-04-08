@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using WoomLink.xlink2.File;
+using WoomLink.Ex;
 using WoomLink.xlink2.File.Res;
 using WoomLink.xlink2.File.Structs;
 
@@ -26,8 +26,8 @@ namespace WoomLink.xlink2
         public Pointer<ResCurveCallTable> CurveTable;
         public Pointer<CurvePointTable> CurvePointTable;
         public Pointer<ResCondition> ConditionTable;
-        public Pointer<ResUserHeader> ExRegionLower;
-        public UintPointer NameTable;
+        public Pointer<ResUserHeader> ExRegionPointer;
+        public UintPointer NameTablePointer;
 
         public Span<ResAssetParam> ResAssetParamTableSpan
         {

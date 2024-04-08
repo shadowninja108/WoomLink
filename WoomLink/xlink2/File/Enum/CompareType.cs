@@ -3,10 +3,10 @@
     public enum CompareType :
 #if XLINK_VER_BLITZ
         uint
-#elif XLINK_VER_THUNDER
+#elif XLINK_VER_PARK || XLINK_VER_THUNDER || XLINK_VER_EXKING
         byte
 #else
-#error Invalid XLink target.
+#error Invalid XLink version target.
 #endif
     {
         Equal = 0x0,

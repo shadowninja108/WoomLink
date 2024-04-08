@@ -7,7 +7,13 @@
         Random2 = 2,
         Blend = 3,
         Sequence = 4,
-        Mono = 5,
-        Unk = 6,
+#if XLINK_VER_THUNDER || XLINK_VER_EXKING
+        Grid,
+#endif
+#if XLINK_VER_EXKING
+        Jump,
+#endif
+        /* Mono appears to be always last. */
+        Mono
     }
 }

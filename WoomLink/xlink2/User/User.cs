@@ -1,7 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using WoomLink.xlink2.Properties;
+using WoomLink.xlink2.User.Instance;
+using WoomLink.xlink2.User.Resource;
 
-namespace WoomLink.xlink2
+namespace WoomLink.xlink2.User
 {
     public class User
     {
@@ -12,8 +15,8 @@ namespace WoomLink.xlink2
         public uint Unk40;
         /* ushort PropertyDefinitionTableCount */
         /* ushort ActionSlotCount */
-        public PropertyDefinition[] PropertyDefinitionTable = null;
-        public string[] ActionSlots;
+        public PropertyDefinition[]? PropertyDefinitionTable = null;
+        public string[]? ActionSlots;
         public byte Unk58 = 0;
 
         public User(string name /* Heap */, System system, uint unk)
@@ -30,7 +33,7 @@ namespace WoomLink.xlink2
             UserResource = system.CreateUserResource(this);
         }
 
-        public void SetActionSlot(string[] actionSlotStrings)
+        public void SetActionSlot(string[]? actionSlotStrings)
         {
             ActionSlots = actionSlotStrings;
         }
@@ -39,11 +42,13 @@ namespace WoomLink.xlink2
         {
             if(count > 0)
                 PropertyDefinitionTable = new PropertyDefinition[count];
+            else
+                PropertyDefinitionTable = Array.Empty<PropertyDefinition>();
         }
 
         public System GetSystem() => UserResource.GetSystem();
 
-        public UserInstance GetLeaderInstance()
+        public UserInstance? GetLeaderInstance()
         {
             if(Instances.Count == 0)
                 return null;

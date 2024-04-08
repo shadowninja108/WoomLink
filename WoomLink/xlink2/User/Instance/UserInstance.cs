@@ -1,12 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using WoomLink.xlink2.File;
 using WoomLink.xlink2.File.Enum;
 
-namespace WoomLink.xlink2
+namespace WoomLink.xlink2.User.Instance
 {
     public abstract class UserInstance
     {
+        [Flags]
+        public enum StateFlags : uint
+        {
+            None = 0,
+            Editor = 1 << 0,
+            Sleeping = 1 << 1,
+            Unk2 = 1 << 2,
+            Unk6 = 1 << 6,
+        }
+
         public class CreateArg
         {
             public string Name;
@@ -17,11 +28,11 @@ namespace WoomLink.xlink2
             /* Vector3f Scale */
             /* int ActionSlotCount */
             public uint LocalPropertyCount;
-            public string[] ActionSlotNames;
+            public string[]? ActionSlotNames;
         }
 
         public List<Event> Events = new();
-        public UserInstanceParam[] Params = new UserInstanceParam[(int)ResMode.Count];
+        public UserInstanceParam?[] ParamsByResMode = new UserInstanceParam?[(int)ResMode.Count];
         public User User;
         /* IUser */
         /* Matrix34* RootMtx */
@@ -33,9 +44,10 @@ namespace WoomLink.xlink2
         public uint[] PropertyValues;
         /* TriggerCtrlMgr */
         /* Bunch of unk... */
-        /* State */
+        public StateFlags State;
         /* Unk pointer */
         /* Buffer of unk */
+
 
         public UserInstance(
             CreateArg arg,
@@ -51,9 +63,11 @@ namespace WoomLink.xlink2
             /* Assign RootMtx to ident if null */
             /* Assign Scale to ones if null */
 
-            if (User.PropertyDefinitionTable.Length > 0)
+            if (User.PropertyDefinitionTable!.Length > 0)
                 PropertyValues = new uint[User.PropertyDefinitionTable.Length];
         }
+
+        private int ParamIndex => (State & StateFlags.Editor) == StateFlags.Editor ? 1 : 0;
 
         public void SetupResource( /* heap */)
         {
@@ -63,19 +77,19 @@ namespace WoomLink.xlink2
             var system = User.GetSystem();
             var loc = system.GetModuleLockObj();
             loc.Lock();
-            var instanceParam = Params[(int)ResMode.Normal];
-            if (IsSetupRomInstanceParam())
+            var instanceParam = ParamsByResMode[(int)ResMode.Normal];
+            if (!IsSetupRomInstanceParam())
             {
                 var resource = User.UserResource;
                 var resourceParam = resource.Params[(int)ResMode.Normal];
-                if (resourceParam != null && !resourceParam.Setup)
+                if (resourceParam == null || !resourceParam.Setup)
                 {
                     resource.Setup();
                 }
 
                 if (instanceParam == null)
                 {
-                    Params[(int)ResMode.Normal] = AllocInstanceParam();
+                    ParamsByResMode[(int)ResMode.Normal] = AllocInstanceParam();
                     SetupInstanceParam(ResMode.Normal);
                     /* TODO: TriggerCtrlMgr::AllocAndSetupCtrlParam */
                 }
@@ -91,10 +105,10 @@ namespace WoomLink.xlink2
             loc.Unlock();
 
 
-            for (var i = 0; i < User.PropertyDefinitionTable.Length; i++)
+            for (var i = 0; i < User.PropertyDefinitionTable!.Length; i++)
             {
                 if((byte)User.PropertyDefinitionTable[i].Type >= (byte) PropertyType.End)
-                    return;
+                    continue;
 
                 PropertyValues[i] = 0;
             }
@@ -102,10 +116,10 @@ namespace WoomLink.xlink2
 
         private void SetupInstanceParam(ResMode mode /* heap */)
         {
-            var instanceParam = Params[(int)mode];
+            var instanceParam = ParamsByResMode[(int)mode]!;
             var resourceParam = User.UserResource.Params[(int)mode];
 
-            var assetNum = resourceParam.User.Header.NumAsset;
+            var assetNum = resourceParam!.User.Header.NumAsset;
             if (assetNum > 0)
             {
                 instanceParam.Connections = new ModelAssetConnection[assetNum];
@@ -131,8 +145,8 @@ namespace WoomLink.xlink2
 
         private bool IsSetupRomInstanceParam()
         {
-            var param = Params[(int)ResMode.Normal];
-            return param != null && !param.Setup;
+            var param = ParamsByResMode[(int)ResMode.Normal];
+            return param != null && param.Setup;
         }
 
         protected void FreeInstanceParam(UserInstanceParam param)
@@ -140,14 +154,70 @@ namespace WoomLink.xlink2
             /* Shout out to the garbage collector. */
         }
 
-        /* makeDebugStringEvent */
+        private bool CheckAndErrorCallWithoutSetup([StringSyntax(StringSyntaxAttribute.CompositeFormat)] string format, params object[] args)
+        {
+            var param = ParamsByResMode[ParamIndex];
+            if (param != null && param.Setup)
+                return true;
+
+            var message = string.Format(format, args);
+            User.GetSystem().AddError(Error.Type.CallWithoutSetup, User, "{0}", message);
+            return false;
+        }
+
+        public bool SearchAsset(ref Locator lco, uint hash)
+        {
+            lco.Reset();
+            if (!User.GetSystem().CallEnable)
+                return false;
+
+            return User.UserResource.SearchAssetCallTableByHash(ref lco, hash);
+        }
+
+        public void MakeDebugStringLocalProperty(ref string output, string key)
+        {
+            /* Null check output. */
+
+            if (key.Length != 0)
+                output += $"-- Local Property (filter [{key}]) --\n";
+            else
+                output += "-- Local Property --\n";
+
+            foreach (var prop in User.PropertyDefinitionTable)
+            {
+                if(prop == null)
+                    continue;
+
+                var name = prop.Name;
+                if(name == null)
+                    continue;
+                if(name.Length == 0)
+                    continue;
+
+                if(!name.Contains(key))
+                    continue;
+
+                switch (prop.Type)
+                {
+                    case PropertyType.Enum:
+                        //var entry = ((EnumPropertyDefinition)prop).SearchEntryValueByKey()
+                        break;
+                    case PropertyType.S32:
+                        break;
+                    case PropertyType.F32:
+                        break;
+                }
+            }
+        }
         public virtual int GetDefaultGroup() => 0;
         public abstract void OnPostCalc();
-        public abstract void OnReset();
+
+        public virtual void OnReset() { }
+
         public abstract UserInstanceParam AllocInstanceParam( /* heap */);
         public abstract void FreeInstanceParam(UserInstanceParam param, ResMode mode);
         public abstract void OnSetupInstanceParam(ResMode mode /* heap */);
-        public abstract void InitModelAssetConnection(ResMode mode, ref ParamDefineTable paramDefine /* heap */);
+        public abstract void InitModelAssetConnection(ResMode mode, in ParamDefineTable paramDefine /* heap */);
 
         public virtual bool DoEventActivatingCallback(Locator locator) => false;
 

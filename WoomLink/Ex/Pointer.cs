@@ -1,13 +1,15 @@
-﻿#if !XLINK_VER_BLITZ && !XLINK_VER_THUNDER
+﻿#if !XLINK_VER_BLITZ && !XLINK_VER_THUNDER && !XLINK_VER_PARK && !XLINK_VER_EXKING
 #error Invalid XLink version target.
 #endif
 
 #if XLINK_ARCH_32
 global using UintPointer = System.UInt32;
 global using IntPointer = System.Int32;
+global using SizeT = System.Int32;
 #elif XLINK_ARCH_64
 global using UintPointer = System.UInt64;
 global using IntPointer = System.Int64;
+global using SizeT = System.Int64;
 #else
 #error Invalid XLink arch target.
 #endif
@@ -19,7 +21,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace WoomLink.xlink2.File
+namespace WoomLink.Ex
 {
     public static class Arch
     {
@@ -48,7 +50,7 @@ namespace WoomLink.xlink2.File
         }
     }
 
-    public struct Heap
+    public struct FakeHeap
     {
         public static readonly int PointerSize = Unsafe.SizeOf<UintPointer>();
 
@@ -56,42 +58,49 @@ namespace WoomLink.xlink2.File
 
         private static Memory<byte> _heap;
 
+        public static Pointer<char> EmptyString;
+
         private const int _heapSize = 0x1800000;
         private const int _baseAddress = 0x10000;
         private const int _alignmentBy = 0x1000;
 
-        static Heap()
+        static FakeHeap()
         {
             _heap = new Memory<byte>(new byte[_heapSize]);
+
+            EmptyString = AllocateT<char>(1);
+            EmptyString.Ref = '\0';
         }
-        public static UintPointer Allocate(UintPointer size)
+        public static UintPointer Allocate(SizeT size)
         {
             var pos = _heapPosition;
-            _heapPosition += size;
+            _heapPosition += (UintPointer) size;
             _heapPosition += _alignmentBy - 1;
             _heapPosition &= ~(UintPointer)(_alignmentBy - 1);
-            Debug.Assert(_heapPosition <=_heapSize);
+            Debug.Assert(_heapPosition <= _heapSize);
             return pos + _baseAddress;
         }
 
-        public static Pointer<TType> AllocateT<TType>(UintPointer size) where TType : unmanaged
+        public static Pointer<TType> AllocateT<TType>(SizeT count) where TType : unmanaged
         {
-            return Pointer<TType>.As(Allocate(size * (UintPointer)Unsafe.SizeOf<TType>()));
+            return Pointer<TType>.As(Allocate(count * (SizeT)Unsafe.SizeOf<TType>()));
         }
 
         public static Span<byte> Span(UintPointer start)
         {
+            //return sead.HeapMgr.Arena!.Data.AsSpan((int)start);
             return _heap[(int)(start - _baseAddress)..].Span;
         }
 
         public static Span<byte> Span(UintPointer start, int length)
         {
+           // return sead.HeapMgr.Arena!.Data.AsSpan((int)start, length);
             return _heap.Slice((int)(start - _baseAddress), length).Span;
         }
     }
 
     [DebuggerDisplay("{ToString()}")]
-    public struct Pointer<TType> where TType : unmanaged
+    public struct Pointer<TType> where TType : struct
     {
         public static int SizeT
         {
@@ -115,7 +124,7 @@ namespace WoomLink.xlink2.File
         {
             PointerValue = pointer;
         }
-        
+
         public readonly ref TType Ref
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -129,7 +138,7 @@ namespace WoomLink.xlink2.File
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly Pointer<TTo> Cast<TTo>() where TTo : unmanaged
+        public readonly Pointer<TTo> Cast<TTo>() where TTo : struct
         {
             return new Pointer<TTo>(PointerValue);
         }
@@ -137,12 +146,12 @@ namespace WoomLink.xlink2.File
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly Span<TType> AsSpan(int length)
         {
-            return MemoryMarshal.Cast<byte, TType>(Heap.Span(PointerValue, SizeT * length));
+            return MemoryMarshal.Cast<byte, TType>(FakeHeap.Span(PointerValue, SizeT * length));
         }
 
         public readonly string AsString()
         {
-            var span = Heap.Span(PointerValue);
+            var span = FakeHeap.Span(PointerValue);
             var length = 0;
             while (span[length] != 0)
                 length++;
@@ -185,7 +194,7 @@ namespace WoomLink.xlink2.File
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly Pointer<TTo> AtEnd<TTo>() where TTo : unmanaged
+        public readonly Pointer<TTo> AtEnd<TTo>() where TTo : struct
         {
             return Add(1).Cast<TTo>();
         }
@@ -193,20 +202,31 @@ namespace WoomLink.xlink2.File
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly Pointer<TType> AlignUp(int alignment)
         {
-            return As(PointerValue + ((UintPointer)(alignment - 1)) & (UintPointer)~(alignment - 1));
+            return As(PointerValue + (UintPointer)(alignment - 1) & (UintPointer)~(alignment - 1));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool IsNull()
+        public readonly bool Equals<T>(Pointer<T> obj) where T : struct
         {
-            return PointerValue == 0;
+            return PointerValue == obj.PointerValue;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly bool Equals(UintPointer ptr)
+        {
+            return PointerValue == ptr;
+        }
+
+        public readonly bool IsNull
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)] get => PointerValue == 0;
         }
 
         public override string ToString()
         {
             var type = GetType();
             var genericType = type.GetTypeInfo().GenericTypeArguments[0];
-            if (IsNull())
+            if (IsNull)
             {
                 return $"{genericType} (null)";
             }
@@ -215,7 +235,7 @@ namespace WoomLink.xlink2.File
                 return AsString();
             }
 
-            return Ref.ToString();
+            return Ref.ToString()!;
         }
     }
 }

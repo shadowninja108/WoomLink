@@ -1,7 +1,7 @@
 ﻿using System;
 using WoomLink.xlink2.File;
 
-namespace WoomLink.xlink2
+namespace WoomLink.xlink2.User.Instance
 {
     public class UserInstanceSLink : UserInstance
     {
@@ -21,11 +21,6 @@ namespace WoomLink.xlink2
             throw new NotImplementedException();
         }
 
-        public override void OnReset()
-        {
-            throw new NotImplementedException();
-        }
-
         public override UserInstanceParam AllocInstanceParam()
         {
             return new UserInstanceParam();
@@ -38,10 +33,11 @@ namespace WoomLink.xlink2
 
         public override void OnSetupInstanceParam(ResMode mode)
         {
-            throw new NotImplementedException();
+            /* Setting up asset limiters and executors. */
+            // throw new NotImplementedException();
         }
 
-        public override void InitModelAssetConnection(ResMode mode, ref ParamDefineTable paramDefine)
+        public override void InitModelAssetConnection(ResMode mode, in ParamDefineTable paramDefine)
         {
             throw new NotImplementedException();
         }
