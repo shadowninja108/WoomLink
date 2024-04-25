@@ -17,11 +17,20 @@ namespace WoomLink
         {
             Console.OutputEncoding = Encoding.Default;
 
-            // var edata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\Splatoon 3\7.1.0\Program\Data\ELink2\elink2.Product.710.belnk.zs"));
-            // var sdata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\Splatoon 3\7.1.0\Program\Data\SLink2\slink2.Product.710.bslnk.zs"));
+            var edata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\Splatoon 3\7.1.0\Program\Data\ELink2\elink2.Product.710.belnk.zs"));
+            var sdata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\Splatoon 3\7.1.0\Program\Data\SLink2\slink2.Product.710.bslnk.zs"));
 
-            var edata = LoadYaz0SarcFileOntoHeap(new(@"R:\Games\Splatoon 2 Global Testfire\1.0.0 (Base)\Program\Data\ELink2\ELink2DB.szs"));
-            var sdata = LoadYaz0SarcFileOntoHeap(new(@"R:\Games\Splatoon 2 Global Testfire\1.0.0 (Base)\Program\Data\SLink2\SLink2DB.szs"));
+            // var edata = LoadYaz0SarcFileOntoHeap(new(@"R:\Games\Splatoon 2 Global Testfire\1.0.0 (Base)\Program\Data\ELink2\ELink2DB.szs"));
+            // var sdata = LoadYaz0SarcFileOntoHeap(new(@"R:\Games\Splatoon 2 Global Testfire\1.0.0 (Base)\Program\Data\SLink2\SLink2DB.szs"));
+
+            // var edata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\Mario vs. Donkey Kong™ Demo\1.0.0 (Base)\Program\Data\ELink2\elink2.Product.dmo.belnk.zs"));
+            // var sdata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\Mario vs. Donkey Kong™ Demo\1.0.0 (Base)\Program\Data\SLink2\slink2.Product.dmo.bslnk.zs"));
+
+            // var dicts = LoadZstdCompressedData(new(@"R:\Games\The Legend of Zelda Tears of the Kingdom\1.0.0 (Base)\Program\Data\Pack\ZsDic.pack.zs"));
+            // var dictsSarc = new Sarc(dicts);
+            // var dict = dictsSarc.OpenFile(dictsSarc.GetNodeIndex("zs.zsdic")).ToArray();
+            // var edata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\The Legend of Zelda Tears of the Kingdom\1.0.0 (Base)\Program\Data\ELink2\elink2.Product.100.belnk.zs"), dict);
+            // var sdata = LoadZstdCompressedDataOntoHeap(new(@"R:\Games\The Legend of Zelda Tears of the Kingdom\1.0.0 (Base)\Program\Data\SLink2\slink2.Product.100.bslnk.zs"), dict);
 
             var esystem = SystemELink.GetInstance();
             var ssystem = SystemSLink.GetInstance();
@@ -99,7 +108,7 @@ namespace WoomLink
             {
                 var name = param.UserDataHashesSpan[i];
                 Console.WriteLine($"{name:X8}");
-                PrintUserByIndex(system, i);
+                Console.WriteLine(PrintUserByIndex(system, i));
             }
         }
 

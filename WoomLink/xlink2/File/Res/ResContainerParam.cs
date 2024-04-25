@@ -12,14 +12,18 @@ namespace WoomLink.xlink2.File.Res
         public ContainerType TypeImpl;
 #elif  XLINK_VER_THUNDER || XLINK_VER_EXKING
         public byte TypeImpl;
-        /* TODO: what is this? */
+        /* TODO: what are these? */
         public byte Field1;
+        public byte Field2;
 #else
 #error Invalid XLink version target.
 #endif
 
         public int ChildrenStartIndex;
         public int ChildrenEndIndex;
+#if XLINK_VER_THUNDER || XLINK_VER_EXKING
+        public int Padding; /* TODO: What is this? */
+#endif
 
         public readonly ContainerType Type => (ContainerType)TypeImpl;
 
