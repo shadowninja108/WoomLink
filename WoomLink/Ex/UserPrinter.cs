@@ -245,17 +245,21 @@ namespace WoomLink.Ex
                 WriteLine(",");
             }
 
-            if (end < start)
+            if (start >= 0 && end >= 0)
             {
-                PrintAssetCall(in param, containerPtr, start);
-            }
-            else
-            {
-                for (var i = start; i <= end; i++)
+                if (end < start)
                 {
-                    PrintAssetCall(in param, containerPtr, i);
+                    PrintAssetCall(in param, containerPtr, start);
+                }
+                else
+                {
+                    for (var i = start; i <= end; i++)
+                    {
+                        PrintAssetCall(in param, containerPtr, i);
+                    }
                 }
             }
+
             UnwrapOnce();
         }
 
@@ -274,7 +278,7 @@ namespace WoomLink.Ex
                     Write(Pointer<char>.As(param.Value + commonParam.NameTablePointer).AsString());
                     Write("\"");
                     break;
-                case ValueReferenceType.Curve:
+                // case ValueReferenceType.Curve:
                 case ValueReferenceType.Direct:
                 {
                     switch (define.Type)

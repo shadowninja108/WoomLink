@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using WoomLink.Ex;
 using WoomLink.sead;
 using WoomLink.xlink2.File.Enum;
@@ -497,51 +499,53 @@ namespace WoomLink.xlink2.File
                     var gridPtr = containerPtr.GetForGrid();
                     ref var grid = ref gridPtr.Ref;
 
-                    if (grid.IsProperty1Global && grid.Property1Index == -1)
+                    /* They either macro/inlined this or really copy-pasted it? I'm doing this though dammit. */
+                    void SolveGridProperty(
+                        bool isGlobal,
+                        ref short propIdx,
+                        Pointer<char> namePtr,
+                        Span<int> valueArray,
+                        ref ResAssetCallTable act,
+                        ref CommonResourceParam resParam
+                    )
                     {
-                        var index = system.SearchGlobalPropertyIndex(grid.Property1Name.AsString());
-                        if (index == -1)
-                        {
-                            system.AddError(Error.Type.NotFoundProperty, null, "property[{0}(G)] in gridContainer({1})",
-                                grid.Property1Name.AsString(), act.KeyName.AsString());
-                        }
-                        else
-                        {
-                            grid.Property1Index = (short)index;
-                            var propDef = system.GlobalPropertyDefinitions[index];
-                            if (propDef.Type == PropertyType.Enum)
-                            {
-                                foreach (ref var value in gridPtr.GetProperty1ValueArray())
-                                {
-                                    var str = Pointer<char>.As(resParam.NameTablePointer + (UintPointer)value);
-                                    value = ((EnumPropertyDefinition)propDef).SearchEntryValueByKey(str.AsString());
-                                }
-                            }
-                        }
-                    }
+                        if (!isGlobal || propIdx != -1) 
+                            return;
 
-                    if (grid.IsProperty2Global && grid.Property2Index == -1)
-                    {
-                        var index = system.SearchGlobalPropertyIndex(grid.Property2Name.AsString());
+                        var index = system.SearchGlobalPropertyIndex(namePtr.AsString());
                         if (index == -1)
                         {
-                            system.AddError(Error.Type.NotFoundProperty, null, "property[{0}(G)] in gridContainer({1})",
-                                grid.Property2Name.AsString(), act.KeyName.AsString());
+                            system.AddError(Error.Type.NotFoundProperty, null, "property[{0}(G)] in gridContainer({1})", namePtr.AsString(), act.KeyName.AsString());
+                            return;
                         }
-                        else
+                        propIdx = (short)index;
+
+                        var propDef = system.GlobalPropertyDefinitions[index];
+                        if (propDef.Type != PropertyType.Enum) 
+                            return;
+
+                        foreach (ref var value in valueArray)
                         {
-                            grid.Property1Index = (short)index;
-                            var propDef = system.GlobalPropertyDefinitions[index];
-                            if (propDef.Type == PropertyType.Enum)
-                            {
-                                foreach (ref var value in gridPtr.GetProperty2ValueArray())
-                                {
-                                    var str = Pointer<char>.As(resParam.NameTablePointer + (UintPointer)value);
-                                    value = ((EnumPropertyDefinition)propDef).SearchEntryValueByKey(str.AsString());
-                                }
-                            }
+                            var str = Pointer<char>.As(resParam.NameTablePointer + (UintPointer)value);
+                            value = ((EnumPropertyDefinition)propDef).SearchEntryValueByKey(str.AsString());
                         }
                     }
+                    SolveGridProperty(
+                        grid.IsProperty1Global,
+                        ref grid.Property1Index,
+                        grid.Property1Name, 
+                        gridPtr.GetProperty1ValueArray(), 
+                        ref act, 
+                        ref resParam
+                    );
+                    SolveGridProperty(
+                        grid.IsProperty2Global,
+                        ref grid.Property2Index,
+                        grid.Property2Name, 
+                        gridPtr.GetProperty2ValueArray(), 
+                        ref act, 
+                        ref resParam
+                    );
                 }
 #endif
             }

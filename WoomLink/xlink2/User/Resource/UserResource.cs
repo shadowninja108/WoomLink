@@ -203,7 +203,7 @@ namespace WoomLink.xlink2.User.Resource
                     if (start > end) 
                         continue;
 
-                    for(var childIdx = start; childIdx < end; childIdx++)
+                    for(var childIdx = start; childIdx <= end-1; childIdx++)
                     {
                         ref var childAct = ref actSpan[childIdx];
                         if(childAct.Condition.IsNull)

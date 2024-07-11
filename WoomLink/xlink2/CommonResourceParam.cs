@@ -29,17 +29,6 @@ namespace WoomLink.xlink2
         public Pointer<ResUserHeader> ExRegionPointer;
         public UintPointer NameTablePointer;
 
-        public Span<ResAssetParam> ResAssetParamTableSpan
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ResAssetParamTable.AsSpan(NumResAssetParam);
-        }
-
-        public Span<ResTriggerOverwriteParam> TriggerOverwriteParamTableSpan
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => TriggerOverwriteParamTable.AsSpan(NumResTriggerOverwriteParam);
-        }
         public Span<Pointer<char>> LocalPropertyNameRefTableSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
