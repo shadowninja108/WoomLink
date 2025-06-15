@@ -158,10 +158,10 @@ namespace WoomLink
         public static T[] ReadArray<T>(this Stream stream, uint count) where T : struct
         {
             /* Allocate space for data. */
-            T[] data = new T[count];
+            var data = new T[count];
 
             /* Read into casted span. */
-            stream.Read(MemoryMarshal.Cast<T, byte>(data));
+            stream.Read(MemoryMarshal.Cast<T, byte>(new Span<T>(data)));
 
             return data;
         }
